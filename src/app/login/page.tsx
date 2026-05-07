@@ -3,42 +3,54 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LoadingButton } from "@/components/loading-button";
 import { MarketingHeader } from "@/components/marketing-header";
 import { useToast } from "@/components/toast";
 
 export default function LoginPage() {
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
+  const qpCallback = searchParams.get("callbackUrl");
+  const authError = searchParams.get("error");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { showToast } = useToast();
 
+  const safeCallback =
+    qpCallback?.startsWith("/") && !qpCallback.startsWith("//") ? qpCallback : "/dashboard";
+
+  useEffect(() => {
+    if (authError === "CredentialsSignin") {
+      setError("Email o contraseña incorrectos.");
+      showToast("Email o contraseña incorrectos.", "error");
+    }
+  }, [authError, showToast]);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
+
+    // callbackUrl correcto: si no, NextAuth usa la URL actual (/login) y la sesión/redirecciones se rompen.
     const res = await signIn("credentials", {
       email: email.trim(),
       password,
       redirect: false,
+      callbackUrl: safeCallback,
     });
+
     setLoading(false);
-    if (res?.error) {
+
+    if (!res?.ok || res.error) {
       setError("Email o contraseña incorrectos.");
       showToast("Email o contraseña incorrectos.", "error");
       return;
     }
+
     showToast("Ingreso exitoso", "success");
-    // Navegación completa: la cookie a veces no acompaña a router.push a tiempo (middleware en Vercel).
-    let next = "/dashboard";
-    if (callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")) {
-      next = callbackUrl;
-    }
-    window.location.assign(next);
+    window.location.assign(safeCallback);
   }
 
   return (
@@ -52,7 +64,7 @@ export default function LoginPage() {
             Creá una
           </Link>
         </p>
-        <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
+        <form onSubmit={(e) => void onSubmit(e)} className="mt-8 flex flex-col gap-4">
           <label className="block text-sm font-medium text-slate-700">
             Email
             <input

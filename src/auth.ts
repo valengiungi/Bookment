@@ -2,16 +2,26 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { z } from "zod";
-import { withDbRetry } from "@/lib/db-retry";
 import authConfig from "./auth.config";
 
 const credentialsSchema = z.object({
-  email: z.preprocess(
-    (v) => (typeof v === "string" ? v.trim().toLowerCase() : v),
-    z.string().email(),
-  ),
+  email: z
+    .string()
+    .transform((s) => s.trim().toLowerCase())
+    .pipe(z.string().min(1).email()),
   password: z.string().min(1),
 });
+
+function pickCredentials(raw: unknown): { email: string; password: string } {
+  if (!raw || typeof raw !== "object") {
+    return { email: "", password: "" };
+  }
+  const o = raw as Record<string, unknown>;
+  return {
+    email: typeof o.email === "string" ? o.email : "",
+    password: typeof o.password === "string" ? o.password : "",
+  };
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -24,21 +34,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Contraseña", type: "password" },
       },
       authorize: async (raw) => {
+        const { email: emailRaw, password: passwordRaw } = pickCredentials(raw);
         const parsed = credentialsSchema.safeParse({
-          email: typeof raw?.email === "string" ? raw.email : "",
-          password: typeof raw?.password === "string" ? raw.password : "",
+          email: emailRaw,
+          password: passwordRaw,
         });
-        if (!parsed.success) return null;
+        if (!parsed.success) {
+          return null;
+        }
 
-        const email = parsed.data.email;
+        const { email, password } = parsed.data;
         const { prisma } = await import("@/lib/prisma");
 
-        const user = await withDbRetry(() =>
-          prisma.user.findUnique({ where: { email } }),
-        );
-        if (!user?.passwordHash) return null;
-        const ok = await compare(parsed.data.password, user.passwordHash);
-        if (!ok) return null;
+        const user = await prisma.user.findUnique({ where: { email } });
+        if (!user?.passwordHash) {
+          return null;
+        }
+
+        try {
+          const ok = await compare(password, user.passwordHash);
+          if (!ok) return null;
+        } catch {
+          return null;
+        }
+
         return {
           id: user.id,
           email: user.email,
