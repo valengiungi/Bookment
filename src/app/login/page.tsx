@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { LoadingButton } from "@/components/loading-button";
@@ -9,7 +9,6 @@ import { MarketingHeader } from "@/components/marketing-header";
 import { useToast } from "@/components/toast";
 
 export default function LoginPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
   const [email, setEmail] = useState("");
@@ -23,7 +22,7 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     const res = await signIn("credentials", {
-      email,
+      email: email.trim(),
       password,
       redirect: false,
     });
@@ -34,8 +33,12 @@ export default function LoginPage() {
       return;
     }
     showToast("Ingreso exitoso", "success");
-    router.push(callbackUrl);
-    router.refresh();
+    // Navegación completa: la cookie a veces no acompaña a router.push a tiempo (middleware en Vercel).
+    let next = "/dashboard";
+    if (callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")) {
+      next = callbackUrl;
+    }
+    window.location.assign(next);
   }
 
   return (

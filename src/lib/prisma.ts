@@ -13,7 +13,14 @@ function getPool() {
     throw new Error("DATABASE_URL is not set");
   }
   if (!globalForPrisma.pgPool) {
-    globalForPrisma.pgPool = new Pool({ connectionString });
+    // Vercel: pocas conexiones por instancia + pooler (Supabase) en DATABASE_URL con ?pgbouncer=true
+    const isServerless = Boolean(process.env.VERCEL);
+    globalForPrisma.pgPool = new Pool({
+      connectionString,
+      max: isServerless ? 1 : 10,
+      idleTimeoutMillis: isServerless ? 3_000 : 30_000,
+      connectionTimeoutMillis: 15_000,
+    });
   }
   return globalForPrisma.pgPool;
 }
