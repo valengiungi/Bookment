@@ -1,6 +1,7 @@
 import { addDays, addMonths } from "date-fns";
 import { formatInTimeZone, toDate } from "date-fns-tz";
-import { auth } from "@/auth";
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";import { withDbRetry } from "@/lib/db-retry";
 import { prisma } from "@/lib/prisma";
 import { formatCalendarMonthTitle } from "@/lib/calendar-display";
 import { defaultTimeZone } from "@/lib/timezone";
@@ -23,7 +24,10 @@ export default async function DashboardHomePage({
 }) {
   const sp = await searchParams;
   const session = await auth();
-  const tenantId = session!.user.tenantId!;
+  const tenantId = session?.user?.tenantId;
+  if (!tenantId) {
+    redirect("/login");
+  }
   const tz = defaultTimeZone;
 
   const todayYmd = formatInTimeZone(new Date(), tz, "yyyy-MM-dd");
@@ -56,10 +60,8 @@ export default async function DashboardHomePage({
   const dayStart = toDate(`${dateYmd}T00:00:00`, { timeZone: tz });
   const dayEnd = addDays(dayStart, 1);
 
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
+  const todayWindowStart = toDate(`${todayYmd}T00:00:00`, { timeZone: tz });
+  const todayWindowEnd = addDays(todayWindowStart, 1);
 
   const [
     todayCount,
@@ -68,42 +70,43 @@ export default async function DashboardHomePage({
     serviceCount,
     monthBookingRows,
     dayBookings,
-  ] = await Promise.all([
-    prisma.booking.count({
-      where: {
-        tenantId,
-        status: "CONFIRMED",
-        startsAt: { gte: start, lt: end },
-      },
-    }),
-    prisma.booking.count({
-      where: {
-        tenantId,
-        status: "CONFIRMED",
-        startsAt: { gte: new Date() },
-      },
-    }),
-    prisma.staff.count({ where: { tenantId, active: true } }),
-    prisma.service.count({ where: { tenantId, active: true } }),
-    prisma.booking.findMany({
-      where: {
-        tenantId,
-        status: "CONFIRMED",
-        startsAt: { gte: rangeStart, lt: rangeEnd },
-      },
-      select: { startsAt: true },
-    }),
-    prisma.booking.findMany({
-      where: {
-        tenantId,
-        status: "CONFIRMED",
-        startsAt: { gte: dayStart, lt: dayEnd },
-      },
-      include: { service: true, staff: true },
-      orderBy: { startsAt: "asc" },
-    }),
-  ]);
-
+  ] = await withDbRetry(() =>
+    Promise.all([
+      prisma.booking.count({
+        where: {
+          tenantId,
+          status: "CONFIRMED",
+          startsAt: { gte: todayWindowStart, lt: todayWindowEnd },
+        },
+      }),
+      prisma.booking.count({
+        where: {
+          tenantId,
+          status: "CONFIRMED",
+          startsAt: { gte: new Date() },
+        },
+      }),
+      prisma.staff.count({ where: { tenantId, active: true } }),
+      prisma.service.count({ where: { tenantId, active: true } }),
+      prisma.booking.findMany({
+        where: {
+          tenantId,
+          status: "CONFIRMED",
+          startsAt: { gte: rangeStart, lt: rangeEnd },
+        },
+        select: { startsAt: true },
+      }),
+      prisma.booking.findMany({
+        where: {
+          tenantId,
+          status: "CONFIRMED",
+          startsAt: { gte: dayStart, lt: dayEnd },
+        },
+        include: { service: true, staff: true },
+        orderBy: { startsAt: "asc" },
+      }),
+    ]),
+  );
   const counts: Record<string, number> = {};
   for (const b of monthBookingRows) {
     const k = formatInTimeZone(b.startsAt, tz, "yyyy-MM-dd");

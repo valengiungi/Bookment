@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { DashboardNav } from "@/components/dashboard-nav";
 import { UserBar } from "@/components/user-bar";
+import { withDbRetry } from "@/lib/db-retry";
 import { prisma } from "@/lib/prisma";
 
 export default async function DashboardLayout({
@@ -11,13 +12,16 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
-  if (!session?.user?.tenantId) {
+  const tenantId = session?.user?.tenantId;
+  if (!tenantId) {
     redirect("/login");
   }
 
-  const tenant = await prisma.tenant.findUnique({
-    where: { id: session.user.tenantId },
-  });
+  const tenant = await withDbRetry(() =>
+    prisma.tenant.findUnique({
+      where: { id: tenantId },
+    }),
+  );
 
   if (!tenant?.onboardingDone) {
     redirect("/onboarding");
