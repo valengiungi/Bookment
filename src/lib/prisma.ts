@@ -17,7 +17,7 @@ function getPool() {
     const isServerless = Boolean(process.env.VERCEL);
     globalForPrisma.pgPool = new Pool({
       connectionString,
-      max: isServerless ? 1 : 10,
+      max: isServerless ? 5 : 10,
       idleTimeoutMillis: isServerless ? 3_000 : 30_000,
       connectionTimeoutMillis: 15_000,
     });
