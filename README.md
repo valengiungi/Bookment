@@ -1,36 +1,84 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Bookment
 
-## Getting Started
+Plataforma multi-tenant para **turnos online**: cada negocio tiene su link público, agenda en el panel y reservas con validación de horarios, bloqueos y profesionales.
 
-First, run the development server:
+Repositorio: [github.com/valengiungi/Bookment](https://github.com/valengiungi/Bookment)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Stack
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Next.js** 16 (App Router) · **React** 19 · **TypeScript**
+- **PostgreSQL** con **Prisma** 7 y adaptador `pg`
+- **Auth.js** (NextAuth v5) con inicio de sesión por credenciales
+- **Tailwind CSS** 4
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Requisitos
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Node.js 20+ (recomendado 22)
+- Una base **PostgreSQL** accesible (local, Supabase, etc.)
 
-## Learn More
+## Configuración
 
-To learn more about Next.js, take a look at the following resources:
+1. Clonar e instalar dependencias:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+   ```bash
+   git clone https://github.com/valengiungi/Bookment.git
+   cd Bookment
+   npm install
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+2. Crear un archivo **`.env`** en la raíz (no se sube al repositorio). Variables típicas:
 
-## Deploy on Vercel
+   | Variable | Descripción |
+   |----------|-------------|
+   | `DATABASE_URL` | URL de conexión PostgreSQL |
+   | `AUTH_SECRET` | Secreto para firmar sesiones (por ejemplo `openssl rand -hex 16`) |
+   | `AUTH_URL` | Origen de la app, ej. `http://localhost:3000` en desarrollo |
+   | `DEFAULT_TIMEZONE` | (Opcional) IANA, por defecto `America/Argentina/Buenos_Aires` |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+3. Aplicar el esquema a la base de datos:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+   ```bash
+   npx prisma db push
+   ```
+
+4. Arrancar en desarrollo:
+
+   ```bash
+   npm run dev
+   ```
+
+   Abrir [http://localhost:3000](http://localhost:3000).
+
+## Scripts útiles
+
+| Comando | Uso |
+|---------|-----|
+| `npm run dev` | Servidor de desarrollo en `localhost:3000` |
+| `npm run build` / `npm run start` | Compilar y producción local |
+| `npm run lint` | ESLint |
+| `npm run db:generate` | Regenerar cliente Prisma |
+| `npm run db:push` | Sincronizar esquema sin migraciones |
+| `npm run db:migrate` | Migraciones en entornos con historial |
+| `npm run db:shift-bookings-month` | Script de mantenimiento para mover turnos entre meses (ver `scripts/shift-bookings-month.ts`) |
+
+Tras `npm install` se ejecuta **`prisma generate`** automáticamente (`postinstall`).
+
+## Estructura (resumen)
+
+- `src/app/` — Rutas: landing, auth, dashboard, onboarding, página pública `/{slug}`, APIs
+- `src/components/` — UI compartida (`PublicBooking`, toasts, layout del dashboard, etc.)
+- `src/lib/` — Prisma, zona horaria, helpers de calendario
+- `src/modules/` — Lógica de negocio (slots, creación de reservas, WhatsApp)
+- `prisma/schema.prisma` — Modelos: tenants, usuarios, servicios, staff, reservas, bloqueos, horarios
+
+Los archivos subidos por tenants van a `public/uploads/` (el contenido real suele ignorarse en git; se versiona `.gitkeep`).
+
+## En producción
+
+- Definir las mismas variables de entorno en el hosting (Vercel, Railway, VPS, etc.).
+- Usar `npm run build` y `npm run start` (o el comando que exponga el proveedor).
+- Asegurar `AUTH_URL` con el dominio público y HTTPS.
+
+## Licencia
+
+Uso personal del autor; si querés open source, definí una licencia explícita en el repo.
