@@ -1,0 +1,183 @@
+// Bookment — multi-tenant bookings (PostgreSQL)
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  SUPER_ADMIN
+  OWNER
+  EMPLOYEE
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+enum BlockReason {
+  MANUAL
+  VACATION
+  HOLIDAY
+}
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  emailVerified  DateTime?
+  passwordHash   String
+  name           String?
+  image          String?
+  role           Role      @default(EMPLOYEE)
+  tenantId       String?
+  tenant         Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  staffProfile   Staff?    @relation("UserStaff")
+  passwordResets PasswordResetToken[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([tenantId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Tenant {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  businessType     String?
+  name             String
+  logoUrl          String?
+  whatsapp         String?
+  location         String?
+  onboardingDone   Boolean  @default(false)
+  onboardingStep   Int      @default(0)
+  subscriptionTier String   @default("free")
+  active           Boolean  @default(true)
+  settings         Json?
+  users            User[]
+  staff            Staff[]
+  services         Service[]
+  workingHours     WorkingHour[]
+  blockedSlots     BlockedSlot[]
+  bookings         Booking[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([active])
+}
+
+model Staff {
+  id             String        @id @default(cuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId         String?       @unique
+  user           User?         @relation("UserStaff", fields: [userId], references: [id])
+  name           String
+  title          String?
+  active         Boolean       @default(true)
+  bookings       Booking[]
+  workingHours   WorkingHour[]
+  blockedSlots   BlockedSlot[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, active])
+}
+
+model Service {
+  id              String    @id @default(cuid())
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name            String
+  durationMinutes Int
+  priceCents      Int?
+  currency        String    @default("ARS")
+  active          Boolean   @default(true)
+  bookings        Booking[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, active])
+}
+
+model WorkingHour {
+  id        String @id @default(cuid())
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staffId   String?
+  staff     Staff? @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  dayOfWeek Int
+  opensAt   String
+  closesAt  String
+
+  @@index([tenantId, staffId, dayOfWeek])
+}
+
+model BlockedSlot {
+  id        String      @id @default(cuid())
+  tenantId  String
+  tenant    Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staffId   String?
+  staff     Staff?      @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  startsAt  DateTime
+  endsAt    DateTime
+  reason    BlockReason @default(MANUAL)
+  note      String?
+  createdAt DateTime    @default(now())
+
+  @@index([tenantId, startsAt])
+  @@index([staffId, startsAt])
+}
+
+model Booking {
+  id              String        @id @default(cuid())
+  tenantId        String
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  serviceId       String
+  service         Service       @relation(fields: [serviceId], references: [id])
+  staffId         String
+  staff           Staff         @relation(fields: [staffId], references: [id])
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  startsAt        DateTime
+  endsAt          DateTime
+  status          BookingStatus @default(CONFIRMED)
+  reminders       ReminderJob[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([tenantId, startsAt])
+  @@index([staffId, startsAt])
+  @@index([staffId, status, startsAt])
+}
+
+/// Cola preparada para recordatorios (ej. 24h antes) — worker/cron futuro
+model ReminderJob {
+  id        String    @id @default(cuid())
+  bookingId String
+  booking   Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  fireAt    DateTime
+  channel   String    @default("whatsapp")
+  payload   Json?
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([fireAt, sentAt])
+}

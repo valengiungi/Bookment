@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# uploaded tenant assets (local / prod storage)
+/public/uploads/*
+!/public/uploads/.gitkeep
+
+# prisma client (regenerate with npm run postinstall / prisma generate)
+/src/generated/prisma
+
