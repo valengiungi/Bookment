@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { getPublicAppOrigin } from "@/lib/public-app-url";
 import { prisma } from "@/lib/prisma";
 import { createStaff } from "@/app/dashboard/actions";
 import { StaffItemActions } from "./staff-item-actions";
@@ -33,11 +34,7 @@ export default async function SettingsPage({
 
   if (!tenant || !user) return null;
 
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL ??
-    (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.AUTH_URL ?? "http://localhost:3000");
+  const origin = getPublicAppOrigin();
 
   const isOwner = session.user.role === "OWNER";
 
