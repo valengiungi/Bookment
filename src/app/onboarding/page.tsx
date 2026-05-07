@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   getCountries,
   getCountryCallingCode,
@@ -33,9 +33,6 @@ export default function OnboardingPage() {
 
   const [businessType, setBusinessType] = useState("");
   const [name, setName] = useState("");
-  const [logoUrl, setLogoUrl] = useState("");
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string>("");
   const [openDays, setOpenDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [opensAt, setOpensAt] = useState("09:00");
   const [closesAt, setClosesAt] = useState("18:00");
@@ -43,7 +40,6 @@ export default function OnboardingPage() {
   const [whatsappCountry, setWhatsappCountry] = useState<CountryCode>("AR");
   const [whatsappLocal, setWhatsappLocal] = useState("");
   const [location, setLocation] = useState("");
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const regionNames = new Intl.DisplayNames(["es"], { type: "region" });
   const countries = getCountries()
     .map((iso) => {
@@ -59,10 +55,12 @@ export default function OnboardingPage() {
     .sort((a, b) => a.name.localeCompare(b.name, "es"));
 
   function displayStep(s: number) {
-    if (s <= 4) return s;
-    if (s === 6) return 5;
-    if (s === 8) return 6;
-    return 7;
+    if (s <= 2) return s;
+    if (s === 4) return 3;
+    if (s === 6) return 4;
+    if (s === 8) return 5;
+    if (s === 9) return 6;
+    return s;
   }
 
   async function postStep(body: unknown) {
@@ -87,40 +85,15 @@ export default function OnboardingPage() {
     return true;
   }
 
-  async function uploadLogo() {
-    if (!logoFile) return logoUrl || null;
-    const form = new FormData();
-    form.append("file", logoFile);
-    const res = await fetch("/api/uploads/logo", {
-      method: "POST",
-      body: form,
-    });
-    const data = (await res.json().catch(() => ({}))) as {
-      error?: string;
-      url?: string;
-    };
-    if (!res.ok || typeof data.url !== "string") {
-      const msg =
-        typeof data.error === "string" ? data.error : "No se pudo subir el logo.";
-      setError(msg);
-      showToast(msg, "error");
-      return null;
-    }
-    setLogoUrl(data.url);
-    return data.url;
-  }
-
   async function nextFrom(stepNo: number) {
     if (stepNo === 1) {
       if (!(await postStep({ step: 1, businessType }))) return;
     }
     if (stepNo === 2) {
       if (!(await postStep({ step: 2, name }))) return;
-    }
-    if (stepNo === 3) {
-      const uploaded = await uploadLogo();
-      if (uploaded === null && logoFile) return;
-      if (!(await postStep({ step: 3, logoUrl: uploaded || logoUrl || null }))) return;
+      if (!(await postStep({ step: 3, logoUrl: null }))) return;
+      setStep(4);
+      return;
     }
     if (stepNo === 4) {
       const hours = openDays.map((dayOfWeek) => ({
@@ -174,36 +147,12 @@ export default function OnboardingPage() {
     setOpenDays((d) => (d.includes(id) ? d.filter((x) => x !== id) : [...d, id]));
   }
 
-  function onLogoChange(file: File | null) {
-    setLogoFile(file);
-    if (!file) {
-      setLogoPreview("");
-      return;
-    }
-    const objectUrl = URL.createObjectURL(file);
-    setLogoPreview(objectUrl);
-  }
-
-  function clearLogoSelection() {
-    setLogoFile(null);
-    setLogoPreview("");
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  }
-
-  useEffect(() => {
-    return () => {
-      if (logoPreview) URL.revokeObjectURL(logoPreview);
-    };
-  }, [logoPreview]);
-
   return (
     <div className="flex min-h-full flex-col">
       <MarketingHeader />
       <main className="mx-auto w-full max-w-lg flex-1 px-4 py-8">
         <p className="text-sm font-medium text-teal-700">
-          Configuración inicial — paso {displayStep(step)} de 7
+          Configuración inicial — paso {displayStep(step)} de 6
         </p>
         <h1 className="mt-2 text-2xl font-semibold text-slate-900">Tu negocio</h1>
         {saved ? (
@@ -261,67 +210,6 @@ export default function OnboardingPage() {
               loadingText="Guardando…"
               idleText="Siguiente"
               disabled={name.length < 2}
-              className="bg-teal-600 text-white hover:bg-teal-700"
-            />
-          </form>
-        ) : null}
-
-        {step === 3 ? (
-          <form
-            className="mt-8 flex flex-col gap-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void nextFrom(3);
-            }}
-          >
-            <label className="text-sm font-medium text-slate-700">
-              Logo (archivo opcional)
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                onChange={(e) => onLogoChange(e.target.files?.[0] ?? null)}
-                className="sr-only"
-              />
-            </label>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-300 hover:bg-teal-50"
-              >
-                Elegir archivo
-              </button>
-              <span className="max-w-[220px] truncate text-sm text-slate-500">
-                {logoFile ? logoFile.name : "Ningún archivo seleccionado"}
-              </span>
-            </div>
-            {logoPreview ? (
-              <div className="relative w-fit">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={logoPreview}
-                  alt="Vista previa del logo"
-                  className="h-20 w-20 rounded-xl border border-slate-200 object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={clearLogoSelection}
-                  className="absolute -top-2 -right-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-sm font-bold text-slate-600 shadow-sm transition hover:bg-rose-50 hover:text-rose-600"
-                  aria-label="Eliminar imagen seleccionada"
-                >
-                  ×
-                </button>
-              </div>
-            ) : null}
-            <p className="text-xs text-slate-500">
-              Podés subir PNG/JPG/WEBP/GIF (máx 2MB) o saltar este paso.
-            </p>
-            <LoadingButton
-              type="submit"
-              loading={loading}
-              loadingText={logoFile ? "Subiendo logo…" : "Guardando…"}
-              idleText="Siguiente"
               className="bg-teal-600 text-white hover:bg-teal-700"
             />
           </form>

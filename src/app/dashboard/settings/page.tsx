@@ -3,8 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { createStaff } from "@/app/dashboard/actions";
 import { StaffItemActions } from "./staff-item-actions";
 import { InactiveStaffActions } from "./inactive-staff-actions";
-import { LogoEditPanel } from "./logo-edit-panel";
 import { WhatsappEditPanel } from "./whatsapp-edit-panel";
+import { SignOutPanel } from "./sign-out-panel";
 import { AccountEmailPanel } from "./account-email-panel";
 import { AccountPasswordPanel } from "./account-password-panel";
 
@@ -49,15 +49,6 @@ export default async function SettingsPage({
         <p className="mt-2 text-xs text-slate-500">
           Compartilo con tus clientes para que reserven solos.
         </p>
-      </section>
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <h2 className="font-medium text-slate-900">Logo público</h2>
-        <p className="mt-2 text-xs text-slate-500">
-          Se muestra en la página de reservas. Si antes subiste el logo en tu PC, en Vercel
-          tenés que volver a subirlo acá (el servidor no guarda archivos en disco).
-        </p>
-        <LogoEditPanel initialLogoUrl={tenant.logoUrl} />
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -115,6 +106,14 @@ export default async function SettingsPage({
           <p className="text-sm font-medium text-slate-800">Contraseña</p>
           <AccountPasswordPanel />
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-4">
+        <h2 className="font-medium text-slate-900">Sesión</h2>
+        <p className="mt-2 text-xs text-slate-500">
+          Cerrar sesión en este dispositivo. Siguen dos pasos para evitar salidas accidentales.
+        </p>
+        <SignOutPanel />
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
