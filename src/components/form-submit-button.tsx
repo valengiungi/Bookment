@@ -7,12 +7,14 @@ export function FormSubmitButton({
   loadingText,
   className,
   spinnerClassName,
+  disabled = false,
 }: {
   idleText: string;
   loadingText: string;
   className: string;
   /** Si se omite, el spinner usa el color del texto (`current`). */
   spinnerClassName?: string;
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
   const spin =
@@ -21,7 +23,7 @@ export function FormSubmitButton({
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={pending || disabled}
       className={`inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-all disabled:opacity-60 ${className}`}
     >
       {pending ? (

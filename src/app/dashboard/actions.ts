@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { compare, hash } from "bcryptjs";
 import { z } from "zod";
-import { auth } from "@/auth";
+import { auth, signOut } from "@/auth";
 import { BlockReason, BookingStatus } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma";
 
@@ -539,4 +539,48 @@ export async function updateAccountPassword(formData: FormData) {
 
   revalidatePath("/dashboard/settings");
   redirect("/dashboard/settings?accountPassword=ok");
+}
+
+export async function deleteTenantPermanently(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    redirect("/dashboard/settings?deleteTenant=forbidden");
+  }
+  if (session.user.role !== "OWNER") {
+    redirect("/dashboard/settings?deleteTenant=forbidden");
+  }
+
+  const tenantId = session.user.tenantId;
+  const confirmName = String(formData.get("confirmName") ?? "").trim();
+  const confirmPhrase = String(formData.get("confirmPhrase") ?? "").trim();
+  const understood = String(formData.get("understood") ?? "") === "yes";
+
+  if (!understood) {
+    redirect("/dashboard/settings?deleteTenant=unchecked");
+  }
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { id: true, name: true },
+  });
+  if (!tenant) {
+    redirect("/dashboard/settings?deleteTenant=missing");
+  }
+  if (confirmName !== tenant.name) {
+    redirect("/dashboard/settings?deleteTenant=nameMismatch");
+  }
+  if (confirmPhrase !== "ELIMINAR") {
+    redirect("/dashboard/settings?deleteTenant=phrase");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.staff.updateMany({
+      where: { tenantId },
+      data: { userId: null },
+    });
+    await tx.user.deleteMany({ where: { tenantId } });
+    await tx.tenant.delete({ where: { id: tenantId } });
+  });
+
+  await signOut({ redirectTo: "/" });
 }

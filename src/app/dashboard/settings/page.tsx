@@ -3,8 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { createStaff } from "@/app/dashboard/actions";
 import { StaffItemActions } from "./staff-item-actions";
 import { InactiveStaffActions } from "./inactive-staff-actions";
+import { LogoEditPanel } from "./logo-edit-panel";
 import { WhatsappEditPanel } from "./whatsapp-edit-panel";
-import { SignOutPanel } from "./sign-out-panel";
+import { DeleteTenantPanel } from "./delete-tenant-panel";
 import { AccountEmailPanel } from "./account-email-panel";
 import { AccountPasswordPanel } from "./account-password-panel";
 
@@ -15,9 +16,10 @@ export default async function SettingsPage({
     staffPurge?: string;
     accountEmail?: string;
     accountPassword?: string;
+    deleteTenant?: string;
   }>;
 }) {
-  const { staffPurge, accountEmail, accountPassword } = await searchParams;
+  const { staffPurge, accountEmail, accountPassword, deleteTenant } = await searchParams;
   const session = await auth();
   const tenantId = session?.user.tenantId;
   const userId = session?.user.id;
@@ -37,6 +39,8 @@ export default async function SettingsPage({
       ? `https://${process.env.VERCEL_URL}`
       : process.env.AUTH_URL ?? "http://localhost:3000");
 
+  const isOwner = session.user.role === "OWNER";
+
   return (
     <div className="space-y-8">
       <h1 className="text-xl font-semibold text-slate-900">Configuración</h1>
@@ -49,6 +53,14 @@ export default async function SettingsPage({
         <p className="mt-2 text-xs text-slate-500">
           Compartilo con tus clientes para que reserven solos.
         </p>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-4">
+        <h2 className="font-medium text-slate-900">Logo público</h2>
+        <p className="mt-2 text-xs text-slate-500">
+          Se muestra en la página de reservas. En Vercel usá Blob (token en variables de entorno).
+        </p>
+        <LogoEditPanel initialLogoUrl={tenant.logoUrl} />
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -109,14 +121,6 @@ export default async function SettingsPage({
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <h2 className="font-medium text-slate-900">Sesión</h2>
-        <p className="mt-2 text-xs text-slate-500">
-          Cerrar sesión en este dispositivo. Siguen dos pasos para evitar salidas accidentales.
-        </p>
-        <SignOutPanel />
-      </section>
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
         <h2 className="font-medium text-slate-900">Profesionales</h2>
         {staffPurge === "bookings" ? (
           <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -166,6 +170,40 @@ export default async function SettingsPage({
             Agregar
           </button>
         </form>
+      </section>
+
+      <section className="rounded-2xl border-2 border-rose-200 bg-white p-4">
+        <h2 className="font-medium text-rose-900">Eliminar negocio</h2>
+        <p className="mt-2 text-xs text-slate-600">
+          Borra el negocio completo en la base de datos: turnos, clientes en historial, servicios,
+          horarios y cuentas de acceso asociadas a este negocio.
+        </p>
+        {deleteTenant === "forbidden" ? (
+          <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">
+            No tenés permiso para esta acción.
+          </p>
+        ) : null}
+        {deleteTenant === "nameMismatch" ? (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            El nombre del negocio no coincide exactamente.
+          </p>
+        ) : null}
+        {deleteTenant === "phrase" ? (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Tenés que escribir ELIMINAR en mayúsculas.
+          </p>
+        ) : null}
+        {deleteTenant === "unchecked" ? (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Marcá la casilla de confirmación.
+          </p>
+        ) : null}
+        {deleteTenant === "missing" ? (
+          <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">
+            No encontramos el negocio. Probá recargar la página.
+          </p>
+        ) : null}
+        <DeleteTenantPanel tenantName={tenant.name} disabled={!isOwner} />
       </section>
     </div>
   );
