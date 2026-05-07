@@ -13,13 +13,14 @@ function getPool() {
     throw new Error("DATABASE_URL is not set");
   }
   if (!globalForPrisma.pgPool) {
-    // Vercel: pocas conexiones por instancia + pooler (Supabase) en DATABASE_URL con ?pgbouncer=true
-    const isServerless = Boolean(process.env.VERCEL);
+    // Supabase (y similares): pocos slots por proyecto. Varias conexiones desde el mismo
+    // proceso agotan el límite → "Max client connections reached". max=1 + URL pooler (6543)
+    // con ?pgbouncer=true es lo recomendado para Prisma.
     globalForPrisma.pgPool = new Pool({
       connectionString,
-      max: isServerless ? 5 : 10,
-      idleTimeoutMillis: isServerless ? 3_000 : 30_000,
-      connectionTimeoutMillis: 15_000,
+      max: 1,
+      idleTimeoutMillis: 20_000,
+      connectionTimeoutMillis: 20_000,
     });
   }
   return globalForPrisma.pgPool;
