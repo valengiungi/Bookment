@@ -2,6 +2,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { createBlock, updateBlock } from "@/app/dashboard/actions";
+import { CreateBlockDatetimeFields, EditBlockDatetimeFields } from "./block-datetime-inputs";
 import { defaultTimeZone } from "@/lib/timezone";
 import { DeleteBlockButton } from "./delete-block-button";
 
@@ -68,29 +69,15 @@ export default async function BlocksPage({
 
       <form
         action={createBlock}
-        className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2"
+        className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2"
       >
-        <label className="text-sm font-medium text-slate-700">
-          Desde
-          <input
-            name="startsAt"
-            type="datetime-local"
-            required
-            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
-          />
-        </label>
-        <label className="text-sm font-medium text-slate-700">
-          Hasta
-          <input
-            name="endsAt"
-            type="datetime-local"
-            required
-            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
-          />
-        </label>
+        <CreateBlockDatetimeFields />
         <label className="text-sm font-medium text-slate-700 sm:col-span-2">
           Motivo
-          <select name="reason" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2">
+          <select
+            name="reason"
+            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-[inset_0_1px_2px_rgba(15,23,42,0.05)] outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25"
+          >
             <option value="MANUAL">Manual</option>
             <option value="VACATION">Vacaciones</option>
             <option value="HOLIDAY">Feriado</option>
@@ -98,7 +85,10 @@ export default async function BlocksPage({
         </label>
         <label className="text-sm font-medium text-slate-700 sm:col-span-2">
           Profesional (vacío = todo el negocio)
-          <select name="staffId" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2">
+          <select
+            name="staffId"
+            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-[inset_0_1px_2px_rgba(15,23,42,0.05)] outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25"
+          >
             <option value="">Todos</option>
             {staff.map((s) => (
               <option key={s.id} value={s.id}>
@@ -109,7 +99,7 @@ export default async function BlocksPage({
         </label>
         <button
           type="submit"
-          className="sm:col-span-2 rounded-xl bg-teal-600 py-3 text-sm font-semibold text-white"
+          className="sm:col-span-2 rounded-xl bg-teal-600 py-3 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(13,148,136,0.35)] transition hover:bg-teal-700"
         >
           Guardar bloqueo
         </button>
@@ -141,35 +131,16 @@ export default async function BlocksPage({
               </summary>
               <form
                 action={updateBlock}
-                className="grid gap-3 border-t border-slate-100 p-3 sm:grid-cols-2"
+                className="grid gap-4 border-t border-slate-100 p-3 sm:grid-cols-2"
               >
                 <input type="hidden" name="blockId" value={b.id} />
-                <label className="text-sm font-medium text-slate-700">
-                  Desde
-                  <input
-                    name="startsAt"
-                    type="datetime-local"
-                    required
-                    defaultValue={formatInTimeZone(b.startsAt, tz, "yyyy-MM-dd'T'HH:mm")}
-                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
-                  />
-                </label>
-                <label className="text-sm font-medium text-slate-700">
-                  Hasta
-                  <input
-                    name="endsAt"
-                    type="datetime-local"
-                    required
-                    defaultValue={formatInTimeZone(b.endsAt, tz, "yyyy-MM-dd'T'HH:mm")}
-                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
-                  />
-                </label>
+                <EditBlockDatetimeFields startsAt={b.startsAt} endsAt={b.endsAt} />
                 <label className="text-sm font-medium text-slate-700 sm:col-span-2">
                   Motivo
                   <select
                     name="reason"
                     defaultValue={b.reason}
-                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-[inset_0_1px_2px_rgba(15,23,42,0.05)] outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25"
                   >
                     <option value="MANUAL">Manual</option>
                     <option value="VACATION">Vacaciones</option>
@@ -181,7 +152,7 @@ export default async function BlocksPage({
                   <select
                     name="staffId"
                     defaultValue={b.staffId ?? ""}
-                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-[inset_0_1px_2px_rgba(15,23,42,0.05)] outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25"
                   >
                     <option value="">Todos</option>
                     {staff.map((s) => (
@@ -193,7 +164,7 @@ export default async function BlocksPage({
                 </label>
                 <button
                   type="submit"
-                  className="sm:col-span-2 rounded-xl bg-teal-600 py-2.5 text-sm font-semibold text-white hover:bg-teal-700"
+                  className="sm:col-span-2 rounded-xl bg-teal-600 py-2.5 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(13,148,136,0.3)] transition hover:bg-teal-700"
                 >
                   Guardar cambios
                 </button>

@@ -10,6 +10,13 @@ import { prisma } from "@/lib/prisma";
 import { parseDatetimeLocalToUtc } from "@/lib/datetime-local";
 import { defaultTimeZone } from "@/lib/timezone";
 
+function readBlockRange(formData: FormData, dateKey: string, timeKey: string, tz: string) {
+  const d = String(formData.get(dateKey) ?? "").trim();
+  const t = String(formData.get(timeKey) ?? "").trim();
+  if (!d || !t) return null;
+  return parseDatetimeLocalToUtc(`${d}T${t}`, tz);
+}
+
 export async function cancelBooking(bookingId: string) {
   const session = await auth();
   if (!session?.user?.tenantId) return;
@@ -35,8 +42,8 @@ export async function createBlock(formData: FormData) {
   }
 
   const tz = defaultTimeZone;
-  const startsAt = parseDatetimeLocalToUtc(formData.get("startsAt"), tz);
-  const endsAt = parseDatetimeLocalToUtc(formData.get("endsAt"), tz);
+  const startsAt = readBlockRange(formData, "startsAtDate", "startsAtTime", tz);
+  const endsAt = readBlockRange(formData, "endsAtDate", "endsAtTime", tz);
   const reasonRaw = String(formData.get("reason") ?? "MANUAL");
   const reason = (
     ["MANUAL", "VACATION", "HOLIDAY"] as const
@@ -90,8 +97,8 @@ export async function updateBlock(formData: FormData) {
   }
 
   const tz = defaultTimeZone;
-  const startsAt = parseDatetimeLocalToUtc(formData.get("startsAt"), tz);
-  const endsAt = parseDatetimeLocalToUtc(formData.get("endsAt"), tz);
+  const startsAt = readBlockRange(formData, "startsAtDate", "startsAtTime", tz);
+  const endsAt = readBlockRange(formData, "endsAtDate", "endsAtTime", tz);
   const reasonRaw = String(formData.get("reason") ?? "MANUAL");
   const reason = (
     ["MANUAL", "VACATION", "HOLIDAY"] as const
