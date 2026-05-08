@@ -8,6 +8,7 @@ const RESERVED = new Set([
   "onboarding",
   "forgot-password",
   "reset-password",
+  "resend-verification",
   "_next",
   "favicon.ico",
   "robots.txt",

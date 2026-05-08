@@ -6,6 +6,7 @@ import { compare, hash } from "bcryptjs";
 import { z } from "zod";
 import { auth, signOut } from "@/auth";
 import { BlockReason, BookingStatus } from "@/generated/prisma";
+import { createVerificationTokenAndSendEmail } from "@/lib/email-verification";
 import { prisma } from "@/lib/prisma";
 import { parseDatetimeLocalToUtc } from "@/lib/datetime-local";
 import { defaultTimeZone } from "@/lib/timezone";
@@ -518,8 +519,13 @@ export async function updateAccountEmail(formData: FormData) {
   try {
     await prisma.user.update({
       where: { id: session.user.id },
-      data: { email: parsed.data.email },
+      data: { email: parsed.data.email, emailVerified: null },
     });
+    try {
+      await createVerificationTokenAndSendEmail(session.user.id, parsed.data.email);
+    } catch (e) {
+      console.error("[updateAccountEmail] verification email", e);
+    }
   } catch (error) {
     if (
       typeof error === "object" &&

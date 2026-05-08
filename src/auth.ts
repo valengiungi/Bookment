@@ -1,8 +1,16 @@
+import { CredentialsSignin } from "@auth/core/errors";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { z } from "zod";
 import authConfig from "./auth.config";
+
+class EmailNotVerified extends CredentialsSignin {
+  constructor() {
+    super();
+    this.code = "email_not_verified";
+  }
+}
 
 const credentialsSchema = z.object({
   email: z
@@ -56,6 +64,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (!ok) return null;
         } catch {
           return null;
+        }
+
+        if (!user.emailVerified && user.role !== "SUPER_ADMIN") {
+          throw new EmailNotVerified();
         }
 
         return {

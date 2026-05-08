@@ -38,10 +38,22 @@ model User {
   tenant         Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   staffProfile   Staff?    @relation("UserStaff")
   passwordResets PasswordResetToken[]
+  emailVerifications EmailVerificationToken[]
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
   @@index([tenantId])
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model PasswordResetToken {
