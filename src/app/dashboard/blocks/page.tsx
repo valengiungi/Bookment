@@ -5,7 +5,12 @@ import { createBlock, updateBlock } from "@/app/dashboard/actions";
 import { defaultTimeZone } from "@/lib/timezone";
 import { DeleteBlockButton } from "./delete-block-button";
 
-export default async function BlocksPage() {
+export default async function BlocksPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ blockMsg?: string }>;
+}) {
+  const { blockMsg } = await searchParams;
   const session = await auth();
   const tenantId = session!.user.tenantId!;
   const tz = defaultTimeZone;
@@ -26,6 +31,16 @@ export default async function BlocksPage() {
     HOLIDAY: "Feriado",
   };
 
+  const blockAlerts: Record<string, string> = {
+    ok: "Cambios guardados.",
+    fecha: "Revisá las fechas y horas.",
+    rango: "“Hasta” tiene que ser posterior a “Desde”.",
+    staff: "Profesional inválido.",
+    id: "Falta identificar el bloqueo. Probá de nuevo.",
+    notfound: "No encontramos ese bloqueo.",
+    auth: "No autorizado.",
+  };
+
   return (
     <div className="space-y-8">
       <div>
@@ -33,7 +48,23 @@ export default async function BlocksPage() {
         <p className="mt-1 text-sm text-slate-600">
           Vacaciones, feriados o franjas manuales. Afectan la disponibilidad pública.
         </p>
+        <p className="mt-2 text-xs text-slate-500">
+          Fechas y horas se interpretan en{" "}
+          <span className="font-medium text-slate-700">{tz}</span> (mismo criterio que el calendario).
+        </p>
       </div>
+
+      {blockMsg && blockAlerts[blockMsg] ? (
+        <p
+          className={`rounded-xl border px-3 py-2 text-sm ${
+            blockMsg === "ok"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              : "border-amber-200 bg-amber-50 text-amber-950"
+          }`}
+        >
+          {blockAlerts[blockMsg]}
+        </p>
+      ) : null}
 
       <form
         action={createBlock}

@@ -7,6 +7,8 @@ import { z } from "zod";
 import { auth, signOut } from "@/auth";
 import { BlockReason, BookingStatus } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma";
+import { parseDatetimeLocalToUtc } from "@/lib/datetime-local";
+import { defaultTimeZone } from "@/lib/timezone";
 
 export async function cancelBooking(bookingId: string) {
   const session = await auth();
@@ -28,10 +30,13 @@ export async function cancelBooking(bookingId: string) {
 
 export async function createBlock(formData: FormData) {
   const session = await auth();
-  if (!session?.user?.tenantId) return;
+  if (!session?.user?.tenantId) {
+    redirect("/dashboard/blocks?blockMsg=auth");
+  }
 
-  const startsAt = new Date(String(formData.get("startsAt")));
-  const endsAt = new Date(String(formData.get("endsAt")));
+  const tz = defaultTimeZone;
+  const startsAt = parseDatetimeLocalToUtc(formData.get("startsAt"), tz);
+  const endsAt = parseDatetimeLocalToUtc(formData.get("endsAt"), tz);
   const reasonRaw = String(formData.get("reason") ?? "MANUAL");
   const reason = (
     ["MANUAL", "VACATION", "HOLIDAY"] as const
@@ -42,15 +47,21 @@ export async function createBlock(formData: FormData) {
   const staffId =
     staffIdRaw && String(staffIdRaw) !== "" ? String(staffIdRaw) : null;
 
-  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) return;
-  if (endsAt <= startsAt) return;
+  if (!startsAt || !endsAt) {
+    redirect("/dashboard/blocks?blockMsg=fecha");
+  }
+  if (endsAt <= startsAt) {
+    redirect("/dashboard/blocks?blockMsg=rango");
+  }
 
   if (staffId) {
     const s = await prisma.staff.findFirst({
       where: { id: staffId, tenantId: session.user.tenantId },
       select: { id: true },
     });
-    if (!s) return;
+    if (!s) {
+      redirect("/dashboard/blocks?blockMsg=staff");
+    }
   }
 
   await prisma.blockedSlot.create({
@@ -64,17 +75,23 @@ export async function createBlock(formData: FormData) {
   });
 
   revalidatePath("/dashboard/blocks");
+  redirect("/dashboard/blocks?blockMsg=ok");
 }
 
 export async function updateBlock(formData: FormData) {
   const session = await auth();
-  if (!session?.user?.tenantId) return;
+  if (!session?.user?.tenantId) {
+    redirect("/dashboard/blocks?blockMsg=auth");
+  }
 
   const blockId = String(formData.get("blockId") ?? "");
-  if (!blockId) return;
+  if (!blockId) {
+    redirect("/dashboard/blocks?blockMsg=id");
+  }
 
-  const startsAt = new Date(String(formData.get("startsAt")));
-  const endsAt = new Date(String(formData.get("endsAt")));
+  const tz = defaultTimeZone;
+  const startsAt = parseDatetimeLocalToUtc(formData.get("startsAt"), tz);
+  const endsAt = parseDatetimeLocalToUtc(formData.get("endsAt"), tz);
   const reasonRaw = String(formData.get("reason") ?? "MANUAL");
   const reason = (
     ["MANUAL", "VACATION", "HOLIDAY"] as const
@@ -85,22 +102,30 @@ export async function updateBlock(formData: FormData) {
   const staffId =
     staffIdRaw && String(staffIdRaw) !== "" ? String(staffIdRaw) : null;
 
-  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) return;
-  if (endsAt <= startsAt) return;
+  if (!startsAt || !endsAt) {
+    redirect("/dashboard/blocks?blockMsg=fecha");
+  }
+  if (endsAt <= startsAt) {
+    redirect("/dashboard/blocks?blockMsg=rango");
+  }
 
   if (staffId) {
     const s = await prisma.staff.findFirst({
       where: { id: staffId, tenantId: session.user.tenantId },
       select: { id: true },
     });
-    if (!s) return;
+    if (!s) {
+      redirect("/dashboard/blocks?blockMsg=staff");
+    }
   }
 
   const row = await prisma.blockedSlot.findFirst({
     where: { id: blockId, tenantId: session.user.tenantId },
     select: { id: true },
   });
-  if (!row) return;
+  if (!row) {
+    redirect("/dashboard/blocks?blockMsg=notfound");
+  }
 
   await prisma.blockedSlot.update({
     where: { id: blockId },
@@ -108,6 +133,7 @@ export async function updateBlock(formData: FormData) {
   });
 
   revalidatePath("/dashboard/blocks");
+  redirect("/dashboard/blocks?blockMsg=ok");
 }
 
 export async function deleteBlock(blockId: string) {
