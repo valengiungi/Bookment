@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { DashboardNav } from "@/components/dashboard-nav";
+import { PlanStripe } from "@/components/plan-stripe";
 import { UserBar } from "@/components/user-bar";
 import { withDbRetry } from "@/lib/db-retry";
 import { prisma } from "@/lib/prisma";
@@ -29,6 +30,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex min-h-full flex-col bg-[color:var(--background)]">
+      <PlanStripe subscriptionTier={tenant.subscriptionTier} />
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-start justify-between gap-2 px-4 py-3">
           <div className="min-w-0">

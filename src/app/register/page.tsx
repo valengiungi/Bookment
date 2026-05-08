@@ -6,34 +6,75 @@ import { LoadingButton } from "@/components/loading-button";
 import { MarketingHeader } from "@/components/marketing-header";
 import { useToast } from "@/components/toast";
 
+const STEPS = 4;
+
 export default function RegisterPage() {
+  const [step, setStep] = useState(0);
   const [businessName, setBusinessName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
-  const [resentHint, setResentHint] = useState(false);
-  const [devLink, setDevLink] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  async function onSubmit(e: React.FormEvent) {
+  function emailLooksValid(value: string) {
+    const s = value.trim().toLowerCase();
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+  }
+
+  function goNext(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setDevLink(null);
+    if (step === 0) {
+      const nameTrim = businessName.trim();
+      if (nameTrim.length < 2) {
+        setError("El nombre del negocio es obligatorio (mínimo 2 caracteres).");
+        showToast("Completá el nombre del negocio.", "error");
+        return;
+      }
+      setStep(1);
+      return;
+    }
+    if (step === 1) {
+      const emailTrim = email.trim().toLowerCase();
+      if (!emailLooksValid(emailTrim)) {
+        setError("Ingresá un email válido (ej. nombre@servicio.com).");
+        showToast("Revisá el email.", "error");
+        return;
+      }
+      setStep(2);
+      return;
+    }
+    if (step === 2) {
+      if (password.length < 8) {
+        setError("La contraseña debe tener al menos 8 caracteres.");
+        showToast("La contraseña es muy corta.", "error");
+        return;
+      }
+      setStep(3);
+    }
+  }
+
+  async function onFinalSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const codeTrim = inviteCode.trim();
+    if (!codeTrim) {
+      setError("El código de invitación es obligatorio.");
+      showToast("Ingresá el código que te pasó el administrador.", "error");
+      return;
+    }
+
     const nameTrim = businessName.trim();
     const emailTrim = email.trim().toLowerCase();
-    const passTrim = password;
-    if (nameTrim.length < 2) {
-      setError("El nombre del negocio es obligatorio (mínimo 2 caracteres).");
-      showToast("Completá el nombre del negocio.", "error");
+    if (nameTrim.length < 2 || !emailLooksValid(emailTrim) || password.length < 8) {
+      setStep(0);
+      setError("Volvé a completar los pasos anteriores.");
       return;
     }
-    if (passTrim.length < 8) {
-      setError("La contraseña debe tener al menos 8 caracteres.");
-      showToast("La contraseña es muy corta.", "error");
-      return;
-    }
+
     setLoading(true);
     try {
       const res = await fetch("/api/auth/register", {
@@ -42,15 +83,11 @@ export default function RegisterPage() {
         body: JSON.stringify({
           businessName: nameTrim,
           email: emailTrim,
-          password: passTrim,
+          password,
+          inviteCode: codeTrim,
         }),
       });
-      let data: {
-        error?: string;
-        needsVerification?: boolean;
-        resent?: boolean;
-        devVerificationLink?: string;
-      } = {};
+      let data: { error?: string; ok?: boolean } = {};
       try {
         data = (await res.json()) as typeof data;
       } catch {
@@ -65,16 +102,9 @@ export default function RegisterPage() {
         showToast(msg, "error");
         return;
       }
-      if (data.needsVerification) {
+      if (data.ok) {
         setDone(true);
-        setResentHint(!!data.resent);
-        if (typeof data.devVerificationLink === "string") {
-          setDevLink(data.devVerificationLink);
-        }
-        showToast(
-          data.resent ? "Te reenviamos el correo de verificación." : "Revisá tu correo para continuar.",
-          "success",
-        );
+        showToast("Cuenta creada. Ya podés ingresar.", "success");
         return;
       }
       setError("Respuesta inesperada del servidor.");
@@ -103,78 +133,135 @@ export default function RegisterPage() {
 
         {done ? (
           <div className="mt-8 space-y-4 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-5 text-sm text-emerald-950">
-            <p className="font-medium">
-              {resentHint
-                ? "Ya había un registro pendiente con este email. Te enviamos de nuevo el enlace."
-                : "Te enviamos un correo para verificar tu dirección."}
-            </p>
+            <p className="font-medium">Listo — tu cuenta y tu negocio ya están creados.</p>
             <p>
-              Abrí el mail, tocá <strong>Verificar mi correo</strong> y después podés{" "}
+              Podés{" "}
               <Link href="/login" className="font-semibold text-teal-800 underline">
-                ingresar
-              </Link>
-              . Sin verificar no se puede iniciar sesión.
-            </p>
-            <p className="text-xs text-emerald-900/80">
-              ¿No llega? Revisá spam o{" "}
-              <Link href="/resend-verification" className="font-semibold underline">
-                pedí otro enlace
+                ingresar con tu email y contraseña
               </Link>
               .
             </p>
-            {devLink ? (
-              <p className="break-all rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-                <span className="font-semibold">Modo desarrollo (sin Resend):</span>{" "}
-                <a href={devLink} className="text-teal-800 underline">
-                  {devLink}
-                </a>
-              </p>
-            ) : null}
           </div>
         ) : (
-          <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
-            <label className="block text-sm font-medium text-slate-700">
-              Nombre del negocio
-              <input
-                type="text"
-                required
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base outline-none ring-teal-500 focus:ring-2"
+          <>
+            <p className="mt-4 text-xs font-medium uppercase tracking-wide text-slate-500">
+              Paso {step + 1} de {STEPS}
+            </p>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+              <div
+                className="h-full rounded-full bg-teal-600 transition-[width] duration-200"
+                style={{ width: `${((step + 1) / STEPS) * 100}%` }}
               />
-            </label>
-            <label className="block text-sm font-medium text-slate-700">
-              Email
-              <input
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base outline-none ring-teal-500 focus:ring-2"
-              />
-            </label>
-            <label className="block text-sm font-medium text-slate-700">
-              Contraseña (mín. 8 caracteres)
-              <input
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base outline-none ring-teal-500 focus:ring-2"
-              />
-            </label>
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
-            <LoadingButton
-              type="submit"
-              loading={loading}
-              loadingText="Creando…"
-              idleText="Continuar"
-              className="mt-2 bg-teal-600 text-base text-white hover:bg-teal-700"
-            />
-          </form>
+            </div>
+
+            {step < 3 ? (
+              <form onSubmit={goNext} className="mt-8 flex flex-col gap-4">
+                {step === 0 ? (
+                  <label className="block text-sm font-medium text-slate-700">
+                    Nombre del negocio
+                    <input
+                      type="text"
+                      required
+                      value={businessName}
+                      onChange={(e) => setBusinessName(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base outline-none ring-teal-500 focus:ring-2"
+                    />
+                  </label>
+                ) : null}
+                {step === 1 ? (
+                  <label className="block text-sm font-medium text-slate-700">
+                    Email
+                    <input
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base outline-none ring-teal-500 focus:ring-2"
+                    />
+                  </label>
+                ) : null}
+                {step === 2 ? (
+                  <label className="block text-sm font-medium text-slate-700">
+                    Contraseña (mín. 8 caracteres)
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      required
+                      minLength={8}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base outline-none ring-teal-500 focus:ring-2"
+                    />
+                  </label>
+                ) : null}
+
+                {error ? <p className="text-sm text-red-600">{error}</p> : null}
+
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
+                  {step > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setError(null);
+                        setStep((s) => s - 1);
+                      }}
+                      className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      Atrás
+                    </button>
+                  ) : (
+                    <span />
+                  )}
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-teal-600 px-4 py-3 text-base font-medium text-white hover:bg-teal-700 sm:min-w-[140px]"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={(e) => void onFinalSubmit(e)} className="mt-8 flex flex-col gap-4">
+                <p className="text-sm text-slate-600">
+                  Por último, ingresá el <strong>código de invitación</strong> que te compartió quien te
+                  dio de alta en Bookment (o el que recibió por correo el administrador).
+                </p>
+                <label className="block text-sm font-medium text-slate-700">
+                  Código de invitación
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    required
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value)}
+                    placeholder="Pegá el código aquí"
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base outline-none ring-teal-500 focus:ring-2"
+                  />
+                </label>
+                {error ? <p className="text-sm text-red-600">{error}</p> : null}
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError(null);
+                      setStep(2);
+                    }}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Atrás
+                  </button>
+                  <LoadingButton
+                    type="submit"
+                    loading={loading}
+                    loadingText="Creando…"
+                    idleText="Crear cuenta"
+                    className="bg-teal-600 text-base text-white hover:bg-teal-700 sm:min-w-[140px]"
+                  />
+                </div>
+              </form>
+            )}
+          </>
         )}
       </main>
     </div>

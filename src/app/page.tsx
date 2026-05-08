@@ -1,5 +1,47 @@
 import Link from "next/link";
 import { MarketingHeader } from "@/components/marketing-header";
+import { getConfiguredListPrices } from "@/lib/platform-pricing";
+import { formatArs } from "@/lib/subscription-pricing";
+
+async function PricingCards() {
+  const { simple, premium } = await getConfiguredListPrices();
+  return (
+    <div className="mx-auto mt-10 grid max-w-3xl gap-6 md:grid-cols-2">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h3 className="text-lg font-semibold text-slate-900">Simple</h3>
+        <p className="mt-1 text-sm text-slate-600">Para negocios que arrancan o con agenda acotada.</p>
+        <p className="mt-3 text-3xl font-bold text-slate-900">
+          {formatArs(simple)}{" "}
+          <span className="text-base font-normal text-slate-500">/ mes</span>
+        </p>
+        <ul className="mt-4 space-y-2 text-sm text-slate-600">
+          <li>• Link público y reservas sin choques de horario</li>
+          <li>• Cupo limitado: hasta 4 servicios y 2 profesionales</li>
+          <li>• Límite mensual de turnos confirmados</li>
+          <li>• Panel para agenda, bloqueos y clientes</li>
+          <li>• Sin aviso por WhatsApp al negocio: el turno queda en la agenda y lo ves al entrar</li>
+        </ul>
+      </div>
+      <div className="rounded-2xl border-2 border-teal-200 bg-teal-50/50 p-6 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">Más vendido</p>
+        <h3 className="mt-1 text-lg font-semibold text-slate-900">Premium</h3>
+        <p className="mt-1 text-sm text-slate-600">Cuando la agenda crece y necesitás datos.</p>
+        <p className="mt-3 text-3xl font-bold text-slate-900">
+          {formatArs(premium)}{" "}
+          <span className="text-base font-normal text-slate-500">/ mes</span>
+        </p>
+        <ul className="mt-4 space-y-2 text-sm text-slate-600">
+          <li>• Sin tope de turnos, servicios ni tamaño de equipo</li>
+          <li>• Métricas de plata estimada y ranking de clientes en tu historial</li>
+          <li>
+            • Descargá tus reservas en un archivo para Excel o planillas (turnos confirmados)
+          </li>
+          <li>• Aviso por WhatsApp al negocio cuando alguien reserva por el link público</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
 
 const industries = [
   "Belleza y estética",
@@ -12,7 +54,7 @@ const industries = [
   "Cualquier agenda por turnos",
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
   return (
     <div className="flex min-h-full flex-col">
       <MarketingHeader />
@@ -123,33 +165,10 @@ export default function HomePage() {
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <h2 className="text-center text-2xl font-semibold text-slate-900">Precios</h2>
             <p className="mx-auto mt-3 max-w-xl text-center text-slate-600">
-              Lanzamiento con plan gratuito para validar tu operación. Pagos y planes premium
-              llegan pronto sin cambiar de plataforma.
+              Dos planes claros. Los montos se pueden ajustar según tu mercado; al registrarte te
+              asignan el plan que acuerdes con quien opera Bookment.
             </p>
-            <div className="mx-auto mt-10 grid max-w-3xl gap-6 md:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h3 className="text-lg font-semibold text-slate-900">Starter</h3>
-                <p className="mt-2 text-3xl font-bold text-slate-900">
-                  $0 <span className="text-base font-normal text-slate-500">/ mes</span>
-                </p>
-                <ul className="mt-4 space-y-2 text-sm text-slate-600">
-                  <li>• Perfil público y link propio</li>
-                  <li>• Reservas con validación de agenda</li>
-                  <li>• Multi-profesionales</li>
-                  <li>• Panel mobile-first</li>
-                </ul>
-              </div>
-              <div className="rounded-2xl border-2 border-teal-200 bg-teal-50/50 p-6 shadow-sm">
-                <h3 className="text-lg font-semibold text-slate-900">Pro</h3>
-                <p className="mt-2 text-3xl font-bold text-slate-900">Próximamente</p>
-                <ul className="mt-4 space-y-2 text-sm text-slate-600">
-                  <li>• Recordatorios automáticos (24h)</li>
-                  <li>• Pagos online</li>
-                  <li>• Planes y límites por tenant</li>
-                  <li>• Métricas avanzadas</li>
-                </ul>
-              </div>
-            </div>
+            <PricingCards />
           </div>
         </section>
 

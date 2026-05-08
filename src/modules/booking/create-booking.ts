@@ -2,6 +2,7 @@ import { addMinutes } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { BookingStatus, type Prisma } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma";
+import { canAcceptAnotherBooking } from "@/lib/plan-limits";
 import { jsDayOfWeekForYmd, POST_SERVICE_BUFFER_MINUTES } from "@/modules/calendar/slots";
 import { defaultTimeZone } from "@/lib/timezone";
 
@@ -56,6 +57,22 @@ export async function createBooking(input: CreateBookingInput) {
   const endLabel = formatInTimeZone(endsAt, tz, "HH:mm");
   if (startLabel < opens || endLabel > closes) {
     return { ok: false as const, code: "OUTSIDE_HOURS" as const };
+  }
+
+  const tenantRow = await prisma.tenant.findUnique({
+    where: { id: input.tenantId },
+    select: { subscriptionTier: true },
+  });
+  if (!tenantRow) {
+    return { ok: false as const, code: "SERVICE_NOT_FOUND" as const };
+  }
+  const bookingOk = await canAcceptAnotherBooking(
+    input.tenantId,
+    tenantRow.subscriptionTier,
+    tz,
+  );
+  if (!bookingOk) {
+    return { ok: false as const, code: "MONTHLY_LIMIT" as const };
   }
 
   try {

@@ -14,6 +14,8 @@ export function HistorySummaryTabs(props: {
   prevMonthHref: string;
   nextMonthHref: string;
   canGoNextMonth: boolean;
+  /** Simple: solo cantidad de turnos; sin plata estimada ni top clientes */
+  insightsLocked: boolean;
 }) {
   const [tab, setTab] = useState<"month" | "all">("month");
   const topTitle =
@@ -72,9 +74,21 @@ export function HistorySummaryTabs(props: {
                 <p className="text-xs text-slate-500">Cortes / turnos confirmados</p>
                 <p className="mt-1 text-xl font-bold text-slate-900">{props.monthCuts}</p>
               </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                <p className="text-xs text-slate-500">Plata del mes</p>
-                <p className="mt-1 text-xl font-bold text-slate-900">{props.monthRevenue}</p>
+              <div
+                className={`rounded-xl border p-3 ${
+                  props.insightsLocked
+                    ? "border-amber-200 bg-amber-50/80"
+                    : "border-slate-100 bg-slate-50"
+                }`}
+              >
+                <p className="text-xs text-slate-500">Plata del mes (estimada)</p>
+                {props.insightsLocked ? (
+                  <p className="mt-1 text-sm font-medium text-amber-950">
+                    Incluido en plan Premium — hablá con quien administra la plataforma.
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xl font-bold text-slate-900">{props.monthRevenue}</p>
+                )}
               </div>
             </div>
           </>
@@ -86,9 +100,21 @@ export function HistorySummaryTabs(props: {
               <p className="text-xs text-slate-500">Cortes / turnos confirmados</p>
               <p className="mt-1 text-xl font-bold text-slate-900">{props.totalCuts}</p>
             </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-              <p className="text-xs text-slate-500">Plata histórica</p>
-              <p className="mt-1 text-xl font-bold text-slate-900">{props.totalRevenue}</p>
+            <div
+              className={`rounded-xl border p-3 ${
+                props.insightsLocked
+                  ? "border-amber-200 bg-amber-50/80"
+                  : "border-slate-100 bg-slate-50"
+              }`}
+            >
+              <p className="text-xs text-slate-500">Plata histórica (estimada)</p>
+              {props.insightsLocked ? (
+                <p className="mt-1 text-sm font-medium text-amber-950">
+                  Plan Premium — mismo contacto que arriba.
+                </p>
+              ) : (
+                <p className="mt-1 text-xl font-bold text-slate-900">{props.totalRevenue}</p>
+              )}
             </div>
           </div>
           </>
@@ -97,7 +123,11 @@ export function HistorySummaryTabs(props: {
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <p className="text-xs font-semibold text-slate-500">{topTitle}</p>
-        {topItems.length === 0 ? (
+        {props.insightsLocked ? (
+          <p className="mt-2 text-sm text-amber-950">
+            Ranking de clientes frecuentes: <strong>plan Premium</strong>.
+          </p>
+        ) : topItems.length === 0 ? (
           <p className="mt-2 text-sm text-slate-500">Sin reservas confirmadas.</p>
         ) : (
           <ul className="mt-2 space-y-1">

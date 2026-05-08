@@ -6,8 +6,8 @@ import { compare, hash } from "bcryptjs";
 import { z } from "zod";
 import { auth, signOut } from "@/auth";
 import { BlockReason, BookingStatus } from "@/generated/prisma";
-import { createVerificationTokenAndSendEmail } from "@/lib/email-verification";
 import { prisma } from "@/lib/prisma";
+import { canCreateService, canCreateStaff } from "@/lib/plan-limits";
 import { parseDatetimeLocalToUtc } from "@/lib/datetime-local";
 import { defaultTimeZone } from "@/lib/timezone";
 
@@ -162,6 +162,15 @@ export async function createService(formData: FormData) {
   const session = await auth();
   if (!session?.user?.tenantId) return;
 
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: session.user.tenantId },
+    select: { subscriptionTier: true },
+  });
+  if (!tenant) return;
+  if (!(await canCreateService(session.user.tenantId, tenant.subscriptionTier))) {
+    redirect("/dashboard/services?planLimit=servicios");
+  }
+
   const name = String(formData.get("name") ?? "").trim();
   const durationMinutes = Number(formData.get("durationMinutes"));
   const price = formData.get("priceAmount");
@@ -232,6 +241,15 @@ export async function updateService(formData: FormData) {
 export async function addSuggestedService(formData: FormData) {
   const session = await auth();
   if (!session?.user?.tenantId) return;
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: session.user.tenantId },
+    select: { subscriptionTier: true },
+  });
+  if (!tenant) return;
+  if (!(await canCreateService(session.user.tenantId, tenant.subscriptionTier))) {
+    redirect("/dashboard/services?planLimit=servicios");
+  }
 
   const name = String(formData.get("name") ?? "").trim();
   const durationMinutes = Number(formData.get("durationMinutes"));
@@ -317,6 +335,15 @@ export async function deleteServicePermanently(formData: FormData) {
 export async function createStaff(formData: FormData) {
   const session = await auth();
   if (!session?.user?.tenantId) return;
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: session.user.tenantId },
+    select: { subscriptionTier: true },
+  });
+  if (!tenant) return;
+  if (!(await canCreateStaff(session.user.tenantId, tenant.subscriptionTier))) {
+    redirect("/dashboard/settings?planLimit=staff");
+  }
 
   const name = String(formData.get("name") ?? "").trim();
   if (name.length < 2) return;
@@ -519,13 +546,8 @@ export async function updateAccountEmail(formData: FormData) {
   try {
     await prisma.user.update({
       where: { id: session.user.id },
-      data: { email: parsed.data.email, emailVerified: null },
+      data: { email: parsed.data.email, emailVerified: new Date() },
     });
-    try {
-      await createVerificationTokenAndSendEmail(session.user.id, parsed.data.email);
-    } catch (e) {
-      console.error("[updateAccountEmail] verification email", e);
-    }
   } catch (error) {
     if (
       typeof error === "object" &&

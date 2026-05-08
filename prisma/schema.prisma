@@ -67,6 +67,40 @@ model PasswordResetToken {
   @@index([userId])
 }
 
+/// Código de alta de un solo uso (solo se guarda el hash).
+model SignupInviteCode {
+  id        String    @id @default(cuid())
+  codeHash  String    @unique
+  usedAt    DateTime?
+  note      String?
+  createdAt DateTime  @default(now())
+
+  @@index([usedAt])
+}
+
+/// Precios de lista Simple/Premium (ARS). El super admin los edita en /admin/economia.
+/// reporting* y configChangedAt son legacy; el código alinea todo con los precios guardados.
+model PlatformPricing {
+  id                     String    @id
+  configuredSimpleArs    Int
+  configuredPremiumArs   Int
+  reportingSimpleArs     Int
+  reportingPremiumArs    Int
+  configChangedAt        DateTime?
+  updatedAt              DateTime  @updatedAt
+}
+
+/// Congelado la primera vez que se abre Economía en cada mes calendario (timezone AR).
+model EconomiaMonthSnapshot {
+  monthKey        String   @id
+  activeSimple    Int
+  activePremium   Int
+  priceSimpleArs  Int
+  pricePremiumArs Int
+  mrrTotalArs     Int
+  createdAt       DateTime @default(now())
+}
+
 model Tenant {
   id               String   @id @default(cuid())
   slug             String   @unique
@@ -77,8 +111,10 @@ model Tenant {
   location         String?
   onboardingDone   Boolean  @default(false)
   onboardingStep   Int      @default(0)
-  subscriptionTier String   @default("free")
+  subscriptionTier String   @default("simple")
   active           Boolean  @default(true)
+  /// Notas internas del super admin (no se muestran al cliente).
+  adminNotes       String?
   settings         Json?
   users            User[]
   staff            Staff[]

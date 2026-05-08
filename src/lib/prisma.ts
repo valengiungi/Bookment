@@ -32,8 +32,12 @@ function createPrisma() {
   return new PrismaClient({ adapter });
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrisma();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+/**
+ * En desarrollo no guardamos el cliente en global: tras `prisma generate` el módulo
+ * del cliente se actualiza pero una instancia vieja en global seguiría sin los nuevos modelos
+ * (p. ej. `platformPricing` undefined). En producción sí reutilizamos para el pool.
+ */
+export const prisma =
+  process.env.NODE_ENV === "production"
+    ? (globalForPrisma.prisma ??= createPrisma())
+    : createPrisma();

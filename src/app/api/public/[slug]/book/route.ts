@@ -64,6 +64,7 @@ export async function POST(
       OUTSIDE_HOURS: 400,
       DOUBLE_BOOK: 409,
       BLOCKED: 400,
+      MONTHLY_LIMIT: 403,
     } as const;
     const status = map[result.code];
     const msg: Record<keyof typeof map, string> = {
@@ -73,6 +74,8 @@ export async function POST(
       OUTSIDE_HOURS: "Fuera del horario",
       DOUBLE_BOOK: "Ese horario ya fue reservado",
       BLOCKED: "Horario no disponible",
+      MONTHLY_LIMIT:
+        "Este mes ya alcanzaste el máximo de turnos de tu plan. Mejorá a Premium o esperá al próximo mes.",
     };
     return NextResponse.json({ error: msg[result.code] }, { status });
   }

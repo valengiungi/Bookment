@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { isReservedSlug } from "@/lib/reserved-slugs";
+import { planDefinitionForTenant } from "@/lib/plans";
 import { PublicBooking } from "@/components/public-booking";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -33,6 +34,8 @@ export default async function PublicTenantPage({ params }: Props) {
 
   if (!tenant) notFound();
 
+  const plan = planDefinitionForTenant(tenant.subscriptionTier);
+
   return (
     <div className="min-h-full bg-slate-50">
       <main className="mx-auto max-w-5xl px-4 py-8">
@@ -40,6 +43,7 @@ export default async function PublicTenantPage({ params }: Props) {
         <PublicBooking
           slug={slug}
           whatsapp={tenant.whatsapp ?? ""}
+          notifyBusinessOnBooking={plan.notifyBusinessOnPublicBooking}
           businessName={tenant.name}
           businessType={tenant.businessType}
           location={tenant.location}

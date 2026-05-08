@@ -18,9 +18,10 @@ export default async function SettingsPage({
     accountEmail?: string;
     accountPassword?: string;
     deleteTenant?: string;
+    planLimit?: string;
   }>;
 }) {
-  const { staffPurge, accountEmail, accountPassword, deleteTenant } = await searchParams;
+  const { staffPurge, accountEmail, accountPassword, deleteTenant, planLimit } = await searchParams;
   const session = await auth();
   const tenantId = session?.user.tenantId;
   const userId = session?.user.id;
@@ -51,6 +52,13 @@ export default async function SettingsPage({
           Compartilo con tus clientes para que reserven solos.
         </p>
       </section>
+
+      {planLimit === "staff" ? (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          Llegaste al máximo de profesionales de tu plan <strong>Simple</strong>. Pedí{" "}
+          <strong>Premium</strong> al administrador de la plataforma o borrá un staff que no uses.
+        </p>
+      ) : null}
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
         <h2 className="font-medium text-slate-900">Logo público</h2>

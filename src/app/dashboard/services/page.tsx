@@ -41,7 +41,12 @@ function suggestionsForBusinessType(businessType?: string | null) {
   ];
 }
 
-export default async function ServicesPage() {
+export default async function ServicesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ planLimit?: string }>;
+}) {
+  const { planLimit } = await searchParams;
   const session = await auth();
   const tenantId = session!.user.tenantId!;
 
@@ -60,6 +65,13 @@ export default async function ServicesPage() {
   return (
     <div className="space-y-8">
       <h1 className="text-xl font-semibold text-slate-900">Servicios</h1>
+
+      {planLimit === "servicios" ? (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          Llegaste al máximo de servicios del plan <strong>Simple</strong>. Pedí{" "}
+          <strong>Premium</strong> a quien administra la plataforma o eliminá servicios que no uses.
+        </p>
+      ) : null}
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-slate-900">Sugeridos para tu rubro</h2>

@@ -20,8 +20,17 @@ export default async function AdminLayout({
             <Link href="/admin" className="font-semibold text-slate-900">
               Super admin
             </Link>
-            <Link href="/" className="text-sm text-slate-600 hover:text-slate-900">
-              Sitio
+            <Link href="/admin/tenants" className="text-sm text-slate-600 hover:text-slate-900">
+              Negocios
+            </Link>
+            <Link href="/admin/plans" className="text-sm text-slate-600 hover:text-slate-900">
+              Planes
+            </Link>
+            <Link href="/admin/invites" className="text-sm text-slate-600 hover:text-slate-900">
+              Invitaciones
+            </Link>
+            <Link href="/admin/economia" className="text-sm text-slate-600 hover:text-slate-900">
+              Economía
             </Link>
           </div>
           <UserBar email={session.user.email} />

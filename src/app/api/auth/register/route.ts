@@ -2,17 +2,30 @@ import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { Role } from "@/generated/prisma";
-import { createVerificationTokenAndSendEmail } from "@/lib/email-verification";
+import { signupEmailSchema } from "@/lib/email-shape";
 import { prisma } from "@/lib/prisma";
 import { ensureUniqueTenantSlug, slugify } from "@/lib/slug";
+import { hashSignupInviteCode } from "@/lib/signup-invite-code";
 
 const bodySchema = z.object({
-  email: z.string().trim().toLowerCase().pipe(z.string().email()),
+  email: signupEmailSchema,
   password: z.string().min(8),
   businessName: z.string().trim().min(2).max(80),
+  inviteCode: z.string().min(1, "El código de invitación es obligatorio."),
 });
 
 export async function POST(req: Request) {
+  const unusedCount = await prisma.signupInviteCode.count({ where: { usedAt: null } });
+  if (unusedCount === 0) {
+    return NextResponse.json(
+      {
+        error:
+          "No hay códigos de invitación disponibles. Pedile uno al administrador de la plataforma.",
+      },
+      { status: 503 },
+    );
+  }
+
   let json: unknown;
   try {
     json = await req.json();
@@ -23,52 +36,45 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(json);
   if (!parsed.success) {
     const first = parsed.error.issues[0];
-    const msg = first?.message ?? "Revisá email, contraseña (8+) y nombre del negocio.";
+    const msg = first?.message ?? "Revisá los datos del formulario.";
     return NextResponse.json({ error: msg }, { status: 400 });
+  }
+
+  const codeHash = hashSignupInviteCode(parsed.data.inviteCode);
+
+  const reserved = await prisma.signupInviteCode.updateMany({
+    where: { codeHash, usedAt: null },
+    data: { usedAt: new Date() },
+  });
+
+  if (reserved.count !== 1) {
+    return NextResponse.json(
+      { error: "Código de invitación incorrecto o ya fue usado." },
+      { status: 403 },
+    );
   }
 
   const email = parsed.data.email;
 
   const existing = await prisma.user.findUnique({
     where: { email },
-    select: { id: true, emailVerified: true },
+    select: { id: true },
   });
 
-  if (existing?.emailVerified) {
+  if (existing) {
+    await prisma.signupInviteCode.updateMany({
+      where: { codeHash },
+      data: { usedAt: null },
+    });
     return NextResponse.json({ error: "El email ya está registrado" }, { status: 409 });
-  }
-
-  if (existing && !existing.emailVerified) {
-    try {
-      const { verifyUrl } = await createVerificationTokenAndSendEmail(existing.id, email);
-      const showDevLink =
-        process.env.NODE_ENV !== "production" && !process.env.RESEND_API_KEY?.trim();
-      return NextResponse.json({
-        ok: true,
-        needsVerification: true,
-        resent: true,
-        ...(showDevLink ? { devVerificationLink: verifyUrl } : {}),
-      });
-    } catch (e) {
-      console.error("[register resend]", e);
-      return NextResponse.json(
-        {
-          error:
-            "No pudimos reenviar el correo. Revisá RESEND_API_KEY en el servidor o probá más tarde.",
-        },
-        { status: 503 },
-      );
-    }
   }
 
   const passwordHash = await hash(parsed.data.password, 10);
   const slug = await ensureUniqueTenantSlug(slugify(parsed.data.businessName) || "negocio");
-
-  let tenantId: string;
-  let userId: string;
+  const now = new Date();
 
   try {
-    const tenant = await prisma.tenant.create({
+    await prisma.tenant.create({
       data: {
         slug,
         name: parsed.data.businessName,
@@ -78,6 +84,7 @@ export async function POST(req: Request) {
             passwordHash,
             name: parsed.data.businessName,
             role: Role.OWNER,
+            emailVerified: now,
           },
         },
         staff: {
@@ -86,18 +93,13 @@ export async function POST(req: Request) {
           },
         },
       },
-      include: { users: { take: 1, select: { id: true } } },
     });
-
-    const uid = tenant.users[0]?.id;
-    if (!uid) {
-      await prisma.tenant.delete({ where: { id: tenant.id } }).catch(() => {});
-      throw new Error("Usuario no creado");
-    }
-    tenantId = tenant.id;
-    userId = uid;
   } catch (err) {
     console.error("[register]", err);
+    await prisma.signupInviteCode.updateMany({
+      where: { codeHash },
+      data: { usedAt: null },
+    });
     return NextResponse.json(
       {
         error:
@@ -107,26 +109,5 @@ export async function POST(req: Request) {
     );
   }
 
-  try {
-    const { verifyUrl } = await createVerificationTokenAndSendEmail(userId, email);
-    const showDevLink =
-      process.env.NODE_ENV !== "production" && !process.env.RESEND_API_KEY?.trim();
-    return NextResponse.json({
-      ok: true,
-      needsVerification: true,
-      tenantSlug: slug,
-      ...(showDevLink ? { devVerificationLink: verifyUrl } : {}),
-    });
-  } catch (e) {
-    console.error("[register verify email]", e);
-    await prisma.user.delete({ where: { id: userId } }).catch(() => {});
-    await prisma.tenant.delete({ where: { id: tenantId } }).catch(() => {});
-    return NextResponse.json(
-      {
-        error:
-          "Cuenta no creada: no pudimos enviar el correo de verificación. Configurá RESEND_API_KEY (producción) o revisá los logs.",
-      },
-      { status: 503 },
-    );
-  }
+  return NextResponse.json({ ok: true, tenantSlug: slug });
 }

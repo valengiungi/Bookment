@@ -2,6 +2,8 @@ import { addMonths } from "date-fns";
 import { formatInTimeZone, toDate } from "date-fns-tz";
 import { auth } from "@/auth";
 import { HistorySummaryTabs } from "@/app/dashboard/history/history-summary-tabs";
+import { HistoryExportButton } from "@/app/dashboard/history/history-export-button";
+import { canExportData, canViewRevenueInsights } from "@/lib/plan-limits";
 import { prisma } from "@/lib/prisma";
 import { defaultTimeZone } from "@/lib/timezone";
 
@@ -46,6 +48,13 @@ export default async function HistoryPage({
 }) {
   const session = await auth();
   const tenantId = session!.user.tenantId!;
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { subscriptionTier: true },
+  });
+  const subscriptionTier = tenant?.subscriptionTier ?? "simple";
+  const insightsLocked = !canViewRevenueInsights(subscriptionTier);
+  const exportOk = canExportData(subscriptionTier);
   const tz = defaultTimeZone;
   const now = new Date();
   const currentMonthStr = formatInTimeZone(now, tz, "yyyy-MM");
@@ -110,7 +119,10 @@ export default async function HistoryPage({
 
   return (
     <div className="space-y-8">
-      <h1 className="text-xl font-semibold text-slate-900">Historial</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-xl font-semibold text-slate-900">Historial</h1>
+        <HistoryExportButton enabled={exportOk} />
+      </div>
 
       <HistorySummaryTabs
         monthLabel={formatInTimeZone(monthStart, tz, "MMMM yyyy")}
@@ -123,6 +135,7 @@ export default async function HistoryPage({
         prevMonthHref={`/dashboard/history?month=${prevMonth}`}
         nextMonthHref={`/dashboard/history?month=${nextMonth}`}
         canGoNextMonth={canGoNextMonth}
+        insightsLocked={insightsLocked}
       />
     </div>
   );

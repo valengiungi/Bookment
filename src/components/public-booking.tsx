@@ -48,6 +48,8 @@ const cellClass: Record<DayStatus, string> = {
 export function PublicBooking(props: {
   slug: string;
   whatsapp: string;
+  /** Si es false (plan Simple), no se abre ni se ofrece WhatsApp al negocio tras reservar. */
+  notifyBusinessOnBooking: boolean;
   businessName: string;
   businessType: string | null;
   location: string | null;
@@ -232,7 +234,7 @@ export function PublicBooking(props: {
     setDone(true);
     void loadCalendar({ silent: true });
 
-    if (service) {
+    if (props.notifyBusinessOnBooking && service) {
       const dateLabel = formatInstantDayHeading(slotPick.startsAt, defaultTimeZone);
       const wa = businessNotifyUrl({
         businessWhatsapp: props.whatsapp,
@@ -419,19 +421,27 @@ export function PublicBooking(props: {
                   <p className="text-base font-semibold text-teal-900">
                     ¡Listo! Tu turno quedó registrado.
                   </p>
-                  <p className="mt-2 text-sm text-teal-800">
-                    Si no se abrió WhatsApp, podés avisar al negocio desde acá.
-                  </p>
-                  {notifyUrl ? (
-                    <a
-                      href={notifyUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-teal-600 px-4 text-sm font-semibold text-white"
-                    >
-                      Abrir WhatsApp
-                    </a>
-                  ) : null}
+                  {props.notifyBusinessOnBooking ? (
+                    <>
+                      <p className="mt-2 text-sm text-teal-800">
+                        Si no se abrió WhatsApp, podés avisar al negocio desde acá.
+                      </p>
+                      {notifyUrl ? (
+                        <a
+                          href={notifyUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-teal-600 px-4 text-sm font-semibold text-white"
+                        >
+                          Abrir WhatsApp
+                        </a>
+                      ) : null}
+                    </>
+                  ) : (
+                    <p className="mt-2 text-sm text-teal-800">
+                      El negocio verá tu reserva en su agenda al ingresar al panel.
+                    </p>
+                  )}
                   <button
                     type="button"
                     onClick={closePanel}
