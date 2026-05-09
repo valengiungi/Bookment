@@ -99,13 +99,15 @@ export default async function ServicesPage({
 
   const addServicesSection = (
     <>
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">Sugeridos para tu rubro</h2>
-        <p className="mt-1 text-xs text-slate-500">
-          Podés agregar solo los que te sirvan. Si no hacés barba, simplemente no la agregues
-          o desactívala abajo.
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+        <h2 className="text-base font-semibold tracking-tight text-slate-900">
+          Sugeridos para tu rubro
+        </h2>
+        <p className="mt-2 text-sm leading-relaxed text-slate-600">
+          Podés agregar solo los que te sirvan. Si no hacés barba, simplemente no la agregues o
+          desactívala abajo.
         </p>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           {suggestions.map((s) => (
             <form key={s.name} action={addSuggestedService}>
               <input type="hidden" name="name" value={s.name} />
@@ -145,13 +147,6 @@ export default async function ServicesPage({
         </p>
       ) : null}
 
-      <StaffServicesPanel
-        sameServicesAllStaff={sameServicesAllStaff}
-        staff={staffList}
-        services={services.filter((s) => s.active).map((s) => ({ id: s.id, name: s.name }))}
-        selectedByStaffId={selectedByStaffId}
-      />
-
       {blockNewServices ? (
         <div className="space-y-4 rounded-2xl border-2 border-amber-400 bg-amber-50/80 p-4 shadow-sm sm:p-5">
           <p className="text-sm font-medium leading-relaxed text-amber-950">
@@ -164,6 +159,13 @@ export default async function ServicesPage({
       ) : (
         addServicesSection
       )}
+
+      <StaffServicesPanel
+        sameServicesAllStaff={sameServicesAllStaff}
+        staff={staffList}
+        services={services.filter((s) => s.active).map((s) => ({ id: s.id, name: s.name }))}
+        selectedByStaffId={selectedByStaffId}
+      />
 
       <ul className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
         {services.map((s) => (
