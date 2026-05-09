@@ -35,7 +35,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     id: "simple",
     label: "Simple",
     short: "Negocio chico o probando la agenda",
-    maxServices: 4,
+    maxServices: 3,
     maxStaff: 2,
     maxMonthlyBookings: 80,
     allowDataExport: false,

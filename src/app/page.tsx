@@ -16,7 +16,7 @@ async function PricingCards() {
         </p>
         <ul className="mt-4 space-y-2 text-sm text-slate-600">
           <li>• Link público y reservas sin choques de horario</li>
-          <li>• Cupo limitado: hasta 4 servicios y 2 profesionales</li>
+          <li>• Cupo limitado: hasta 3 servicios y 2 profesionales</li>
           <li>• Límite mensual de turnos confirmados</li>
           <li>• Panel para agenda, bloqueos y clientes</li>
           <li>• Sin aviso por WhatsApp al negocio: el turno queda en la agenda y lo ves al entrar</li>

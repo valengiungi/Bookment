@@ -4,12 +4,17 @@ import { useState } from "react";
 import { FormSubmitButton } from "@/components/form-submit-button";
 import { createService } from "@/app/dashboard/actions";
 
-export function CreateServicePanel() {
+export function CreateServicePanel({ atServiceLimit = false }: { atServiceLimit?: boolean }) {
   const [open, setOpen] = useState(false);
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4">
-      {!open ? (
+      {atServiceLimit ? (
+        <p className="text-sm text-slate-600">
+          El botón para crear un servicio nuevo está desactivado hasta que liberes un lugar o subas de
+          plan.
+        </p>
+      ) : !open ? (
         <button
           type="button"
           onClick={() => setOpen(true)}

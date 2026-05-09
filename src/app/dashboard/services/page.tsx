@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { FormSubmitButton } from "@/components/form-submit-button";
 import { prisma } from "@/lib/prisma";
+import { getEffectivePlanId, planDefinitionForTenant } from "@/lib/plans";
 import {
   addSuggestedService,
 } from "@/app/dashboard/actions";
@@ -41,12 +42,7 @@ function suggestionsForBusinessType(businessType?: string | null) {
   ];
 }
 
-export default async function ServicesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ planLimit?: string }>;
-}) {
-  const { planLimit } = await searchParams;
+export default async function ServicesPage() {
   const session = await auth();
   const tenantId = session!.user.tenantId!;
 
@@ -57,22 +53,22 @@ export default async function ServicesPage({
     }),
     prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { businessType: true },
+      select: { businessType: true, subscriptionTier: true },
     }),
   ]);
   const suggestions = suggestionsForBusinessType(tenant?.businessType);
+  const planDef = planDefinitionForTenant(tenant?.subscriptionTier ?? "simple");
+  const planId = getEffectivePlanId(tenant?.subscriptionTier ?? "simple");
+  const serviceCap = planDef.maxServices;
+  const atServiceLimit =
+    planId === "simple" &&
+    serviceCap != null &&
+    services.length >= serviceCap;
+  /** Solo cuando el cupo real está lleno; el redirect ?planLimit= queda en la URL pero no bloquea si liberó lugar. */
+  const blockNewServices = atServiceLimit;
 
-  return (
-    <div className="space-y-8">
-      <h1 className="text-xl font-semibold text-slate-900">Servicios</h1>
-
-      {planLimit === "servicios" ? (
-        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          Llegaste al máximo de servicios del plan <strong>Simple</strong>. Pedí{" "}
-          <strong>Premium</strong> a quien administra la plataforma o eliminá servicios que no uses.
-        </p>
-      ) : null}
-
+  const addServicesSection = (
+    <>
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-slate-900">Sugeridos para tu rubro</h2>
         <p className="mt-1 text-xs text-slate-500">
@@ -91,14 +87,34 @@ export default async function ServicesPage({
               <FormSubmitButton
                 idleText={`+ ${s.name} (${s.durationMinutes} min)`}
                 loadingText="Agregando…"
-                className="rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs text-teal-800 hover:bg-teal-100"
+                disabled={blockNewServices}
+                className="rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs text-teal-800 hover:bg-teal-100 disabled:cursor-not-allowed disabled:hover:bg-teal-50"
               />
             </form>
           ))}
         </div>
       </section>
 
-      <CreateServicePanel />
+      <CreateServicePanel atServiceLimit={blockNewServices} />
+    </>
+  );
+
+  return (
+    <div className="space-y-8">
+      <h1 className="text-xl font-semibold text-slate-900">Servicios</h1>
+
+      {blockNewServices ? (
+        <div className="space-y-4 rounded-2xl border-2 border-amber-400 bg-amber-50/80 p-4 shadow-sm sm:p-5">
+          <p className="text-sm font-medium leading-relaxed text-amber-950">
+            Con el plan <strong>Simple</strong> no podés añadir más servicios: llegaste al máximo (
+            {serviceCap ?? services.length} incluidos). Para tener más, adquirí el plan{" "}
+            <strong>Premium</strong> (servicios ilimitados) o eliminá alguno de la lista que no uses.
+          </p>
+          {addServicesSection}
+        </div>
+      ) : (
+        addServicesSection
+      )}
 
       <ul className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
         {services.map((s) => (
