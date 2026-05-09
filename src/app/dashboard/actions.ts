@@ -244,51 +244,6 @@ export async function updateService(formData: FormData) {
   revalidatePath("/dashboard/services");
 }
 
-export async function addSuggestedService(formData: FormData) {
-  const session = await auth();
-  if (!session?.user?.tenantId) return;
-
-  const tenant = await prisma.tenant.findUnique({
-    where: { id: session.user.tenantId },
-    select: { subscriptionTier: true },
-  });
-  if (!tenant) return;
-  if (!(await canCreateService(session.user.tenantId, tenant.subscriptionTier))) {
-    redirect("/dashboard/services?planLimit=servicios");
-  }
-
-  const name = String(formData.get("name") ?? "").trim();
-  const durationMinutes = Number(formData.get("durationMinutes"));
-  if (name.length < 2) return;
-  if (!Number.isFinite(durationMinutes) || durationMinutes < 5) return;
-
-  const existing = await prisma.service.findFirst({
-    where: { tenantId: session.user.tenantId, name },
-  });
-
-  let svcId: string;
-  if (existing) {
-    await prisma.service.update({
-      where: { id: existing.id },
-      data: { active: true, durationMinutes },
-    });
-    svcId = existing.id;
-  } else {
-    const created = await prisma.service.create({
-      data: {
-        tenantId: session.user.tenantId,
-        name,
-        durationMinutes,
-        active: true,
-      },
-    });
-    svcId = created.id;
-  }
-  await linkServiceToAllStaffInPerStaffMode(prisma, session.user.tenantId, svcId);
-
-  revalidatePath("/dashboard/services");
-}
-
 export async function toggleServiceActive(formData: FormData) {
   const session = await auth();
   if (!session?.user?.tenantId) return;
