@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { isReservedSlug } from "@/lib/reserved-slugs";
 import { defaultTimeZone } from "@/lib/timezone";
 import { canAcceptAnotherBooking } from "@/lib/plan-limits";
+import { staffOffersService } from "@/lib/staff-services";
 import { buildSlotStarts, formatSlotLabel } from "@/modules/calendar/slots";
 
 export async function GET(
@@ -28,6 +29,7 @@ export async function GET(
 
   const tenant = await prisma.tenant.findFirst({
     where: { slug, active: true },
+    select: { id: true, subscriptionTier: true, sameServicesAllStaff: true },
   });
   if (!tenant) {
     return NextResponse.json({ error: "Negocio no encontrado" }, { status: 404 });
@@ -45,6 +47,20 @@ export async function GET(
   });
   if (!staff) {
     return NextResponse.json({ error: "Profesional no encontrado" }, { status: 404 });
+  }
+
+  const comboOk = await staffOffersService(
+    prisma,
+    tenant.id,
+    tenant.sameServicesAllStaff,
+    staffId,
+    serviceId,
+  );
+  if (!comboOk) {
+    return NextResponse.json(
+      { error: "Este profesional no ofrece ese servicio" },
+      { status: 400 },
+    );
   }
 
   const tz = defaultTimeZone;

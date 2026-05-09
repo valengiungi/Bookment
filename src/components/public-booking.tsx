@@ -68,6 +68,10 @@ export function PublicBooking(props: {
   logoUrl: string | null;
   services: Service[];
   staff: Staff[];
+  /** Si es false, solo se listan servicios según `serviceIdsByStaffId` para el profesional elegido. */
+  sameServicesAllStaff?: boolean;
+  /** Clave: staffId → ids de servicios que ofrece (solo si sameServicesAllStaff es false). */
+  serviceIdsByStaffId?: Record<string, string[]>;
 }) {
   const nowInit = useMemo(() => new Date(), []);
   const initialMonth = useMemo(() => {
@@ -88,6 +92,9 @@ export function PublicBooking(props: {
     props.monthlyQuotaBlocked === true,
   );
 
+  const sameAll = props.sameServicesAllStaff !== false;
+  const idsByStaff = props.serviceIdsByStaffId ?? {};
+
   const [selectedYmd, setSelectedYmd] = useState<string | null>(null);
   const [serviceId, setServiceId] = useState(props.services[0]?.id ?? "");
   const [staffId, setStaffId] = useState(props.staff[0]?.id ?? "");
@@ -107,10 +114,21 @@ export function PublicBooking(props: {
     [monthStr],
   );
 
+  const servicesForStaff = useMemo(() => {
+    if (sameAll) return props.services;
+    const allowed = new Set(idsByStaff[staffId] ?? []);
+    return props.services.filter((s) => allowed.has(s.id));
+  }, [sameAll, idsByStaff, staffId, props.services]);
+
   const service = useMemo(
-    () => props.services.find((s) => s.id === serviceId),
-    [props.services, serviceId],
+    () => servicesForStaff.find((s) => s.id === serviceId),
+    [servicesForStaff, serviceId],
   );
+
+  useEffect(() => {
+    if (servicesForStaff.some((s) => s.id === serviceId)) return;
+    setServiceId(servicesForStaff[0]?.id ?? "");
+  }, [staffId, servicesForStaff, serviceId]);
 
   const loadCalendar = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -511,18 +529,28 @@ export function PublicBooking(props: {
                       value={serviceId}
                       onChange={(e) => setServiceId(e.target.value)}
                       className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-3 text-base"
+                      disabled={servicesForStaff.length === 0}
                     >
-                      {props.services.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                          {s.priceCents != null
-                            ? ` — $${(s.priceCents / 100).toLocaleString("es-AR")}`
-                            : ""}{" "}
-                          ({s.durationMinutes} min)
-                        </option>
-                      ))}
+                      {servicesForStaff.length === 0 ? (
+                        <option value="">Sin servicios para este profesional</option>
+                      ) : (
+                        servicesForStaff.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                            {s.priceCents != null
+                              ? ` — $${(s.priceCents / 100).toLocaleString("es-AR")}`
+                              : ""}{" "}
+                            ({s.durationMinutes} min)
+                          </option>
+                        ))
+                      )}
                     </select>
                   </label>
+                  {!sameAll && servicesForStaff.length === 0 ? (
+                    <p className="text-xs text-amber-800">
+                      Este profesional no tiene servicios asignados en el panel del negocio.
+                    </p>
+                  ) : null}
 
                   <label className="block text-sm font-medium text-slate-800">
                     Profesional

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 import { compare, hash } from "bcryptjs";
 import { z } from "zod";
 import { auth, signOut } from "@/auth";
@@ -10,6 +10,11 @@ import { prisma } from "@/lib/prisma";
 import { canCreateService, canCreateStaff } from "@/lib/plan-limits";
 import { parseDatetimeLocalToUtc } from "@/lib/datetime-local";
 import { defaultTimeZone } from "@/lib/timezone";
+import {
+  linkNewStaffToAllServices,
+  linkServiceToAllStaffInPerStaffMode,
+  seedFullStaffServiceMatrix,
+} from "@/lib/staff-services";
 
 function readBlockRange(formData: FormData, dateKey: string, timeKey: string, tz: string) {
   const d = String(formData.get(dateKey) ?? "").trim();
@@ -187,7 +192,7 @@ export async function createService(formData: FormData) {
   if (!Number.isFinite(durationMinutes) || durationMinutes < 5) return;
   if (price !== null && String(price).trim() !== "" && priceCents === null) return;
 
-  await prisma.service.create({
+  const created = await prisma.service.create({
     data: {
       tenantId: session.user.tenantId,
       name,
@@ -195,6 +200,7 @@ export async function createService(formData: FormData) {
       priceCents: priceCents ?? null,
     },
   });
+  await linkServiceToAllStaffInPerStaffMode(prisma, session.user.tenantId, created.id);
 
   revalidatePath("/dashboard/services");
 }
@@ -260,13 +266,15 @@ export async function addSuggestedService(formData: FormData) {
     where: { tenantId: session.user.tenantId, name },
   });
 
+  let svcId: string;
   if (existing) {
     await prisma.service.update({
       where: { id: existing.id },
       data: { active: true, durationMinutes },
     });
+    svcId = existing.id;
   } else {
-    await prisma.service.create({
+    const created = await prisma.service.create({
       data: {
         tenantId: session.user.tenantId,
         name,
@@ -274,7 +282,9 @@ export async function addSuggestedService(formData: FormData) {
         active: true,
       },
     });
+    svcId = created.id;
   }
+  await linkServiceToAllStaffInPerStaffMode(prisma, session.user.tenantId, svcId);
 
   revalidatePath("/dashboard/services");
 }
@@ -297,6 +307,10 @@ export async function toggleServiceActive(formData: FormData) {
     where: { id: row.id },
     data: { active },
   });
+
+  if (active) {
+    await linkServiceToAllStaffInPerStaffMode(prisma, session.user.tenantId, row.id);
+  }
 
   revalidatePath("/dashboard/services");
 }
@@ -332,6 +346,83 @@ export async function deleteServicePermanently(formData: FormData) {
   revalidatePath("/dashboard/services");
 }
 
+export async function setServicesAssignmentMode(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) return;
+
+  const raw = String(formData.get("sameServicesAllStaff") ?? "").toLowerCase();
+  const sameServicesAllStaff = raw === "true" || raw === "1" || raw === "on";
+
+  await prisma.tenant.update({
+    where: { id: session.user.tenantId },
+    data: { sameServicesAllStaff },
+  });
+
+  if (!sameServicesAllStaff) {
+    await seedFullStaffServiceMatrix(prisma, session.user.tenantId);
+  } else {
+    await prisma.staffService.deleteMany({
+      where: { staff: { tenantId: session.user.tenantId } },
+    });
+  }
+
+  revalidatePath("/dashboard/services");
+}
+
+export async function updateStaffServiceAssignments(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    redirect("/login");
+  }
+
+  const staffId = String(formData.get("staffId") ?? "").trim();
+  if (!staffId) {
+    redirect("/dashboard/services?staffServices=err");
+  }
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: session.user.tenantId },
+    select: { sameServicesAllStaff: true },
+  });
+  if (!tenant || tenant.sameServicesAllStaff) {
+    redirect("/dashboard/services?staffServices=mode");
+  }
+
+  const staff = await prisma.staff.findFirst({
+    where: { id: staffId, tenantId: session.user.tenantId, active: true },
+    select: { id: true },
+  });
+  if (!staff) {
+    redirect("/dashboard/services?staffServices=err");
+  }
+
+  const requestedIds = formData.getAll("serviceId").map(String).filter(Boolean);
+  const valid =
+    requestedIds.length === 0
+      ? []
+      : await prisma.service.findMany({
+          where: {
+            tenantId: session.user.tenantId,
+            id: { in: requestedIds },
+            active: true,
+          },
+          select: { id: true },
+        });
+  const ids = valid.map((s) => s.id);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.staffService.deleteMany({ where: { staffId } });
+    if (ids.length > 0) {
+      await tx.staffService.createMany({
+        data: ids.map((serviceId) => ({ staffId, serviceId })),
+      });
+    }
+  });
+
+  revalidatePath("/dashboard/services");
+  redirect("/dashboard/services?staffServices=ok", RedirectType.push);
+}
+
 export async function createStaff(formData: FormData) {
   const session = await auth();
   if (!session?.user?.tenantId) return;
@@ -348,11 +439,13 @@ export async function createStaff(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   if (name.length < 2) return;
 
-  await prisma.staff.create({
+  const created = await prisma.staff.create({
     data: { tenantId: session.user.tenantId, name },
   });
+  await linkNewStaffToAllServices(prisma, session.user.tenantId, created.id);
 
   revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard/services");
 }
 
 export async function updateStaff(formData: FormData) {

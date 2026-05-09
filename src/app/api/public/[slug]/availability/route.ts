@@ -61,6 +61,22 @@ export async function GET(
     return NextResponse.json({ error: "Negocio no encontrado" }, { status: 404 });
   }
 
+  const staffServicePairs = new Set<string>();
+  if (!tenant.sameServicesAllStaff && tenant.staff.length && tenant.services.length) {
+    const links = await prisma.staffService.findMany({
+      where: {
+        staffId: { in: tenant.staff.map((s) => s.id) },
+        serviceId: { in: tenant.services.map((s) => s.id) },
+      },
+      select: { staffId: true, serviceId: true },
+    });
+    for (const l of links) {
+      staffServicePairs.add(`${l.staffId}:${l.serviceId}`);
+    }
+  }
+  const staffOffers = (staffId: string, serviceId: string) =>
+    tenant.sameServicesAllStaff || staffServicePairs.has(`${staffId}:${serviceId}`);
+
   if (!tenant.services.length || !tenant.staff.length) {
     return NextResponse.json({
       month: monthRaw,
@@ -137,6 +153,7 @@ export async function GET(
       const busy = busyForStaffDay(st.id, dayStart, dayEnd, bookings, blocks);
 
       for (const svc of tenant.services) {
+        if (!staffOffers(st.id, svc.id)) continue;
         const slots = buildSlotStarts({
           dateYmd,
           durationMinutes: svc.durationMinutes,

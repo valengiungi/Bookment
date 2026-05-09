@@ -5,10 +5,10 @@ import { useState } from "react";
 import { LoadingButton } from "@/components/loading-button";
 import { MarketingHeader } from "@/components/marketing-header";
 import { useToast } from "@/components/toast";
+import { BOOKMENT_ADMIN_PHONE, bookmentAdminWhatsAppDigits } from "@/lib/admin-contact";
 
 const STEPS = 4;
-const INVITE_CONTACT_PHONE = "+54 223 5049768";
-const INVITE_CONTACT_WA = INVITE_CONTACT_PHONE.replace(/\D/g, "");
+const INVITE_CONTACT_WA = bookmentAdminWhatsAppDigits();
 const INVITE_CONTACT_MESSAGE =
   "Hola! Estoy interesado en formar parte de Bookment y quisiera solicitar un código de invitación. También me gustaría recibir información sobre planes y precios disponibles. Muchas gracias.";
 
@@ -239,7 +239,7 @@ export default function RegisterPage() {
                     rel="noreferrer"
                     className="font-semibold text-teal-700 hover:underline"
                   >
-                    {INVITE_CONTACT_PHONE}
+                    {BOOKMENT_ADMIN_PHONE}
                   </a>
                   .
                 </p>

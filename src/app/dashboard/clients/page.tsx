@@ -1,13 +1,19 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { defaultTimeZone } from "@/lib/timezone";
-import { getEffectivePlanId, planLabel } from "@/lib/plans";
+import { getEffectivePlanId } from "@/lib/plans";
 import { es } from "date-fns/locale/es";
 import { formatInTimeZone } from "date-fns-tz";
+import { ClientsWaCell } from "./clients-wa-cell";
 
 /** Siempre datos frescos (plan y reservas pueden cambiar sin redeploy). */
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Clientes · WPP",
+};
 
 function waHref(phone: string, body?: string) {
   const n = phone.replace(/\D/g, "");
@@ -15,6 +21,15 @@ function waHref(phone: string, body?: string) {
   return body
     ? `https://wa.me/${n}?text=${encodeURIComponent(body)}`
     : `https://wa.me/${n}`;
+}
+
+/** Icono estrella / brillo para la pastilla PREMIUM (cabecera de columna). */
+function SparkleGlyph({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+      <path d="M8 1l1.05 4.2L13.2 6.5l-4.15 1.3L8 12l-1.05-4.2L2.8 6.5l4.15-1.3L8 1z" />
+    </svg>
+  );
 }
 
 export default async function ClientsPage() {
@@ -28,7 +43,6 @@ export default async function ClientsPage() {
   });
   const tier = tenant?.subscriptionTier ?? "simple";
   const isPremium = getEffectivePlanId(tier) === "premium";
-  const planName = planLabel(tier);
 
   const grouped = await prisma.booking.groupBy({
     by: ["customerPhone", "customerName"],
@@ -40,12 +54,7 @@ export default async function ClientsPage() {
     take: 80,
   });
 
-  const top = grouped.slice(0, 5);
-  const rest = grouped.slice(5);
-  const restByLastVisit = [...rest].sort(
-    (a, b) => (b._max.startsAt?.getTime() ?? 0) - (a._max.startsAt?.getTime() ?? 0),
-  );
-  const simpleRows = [...grouped].sort(
+  const rows = [...grouped].sort(
     (a, b) => (b._max.startsAt?.getTime() ?? 0) - (a._max.startsAt?.getTime() ?? 0),
   );
 
@@ -53,14 +62,17 @@ export default async function ClientsPage() {
     d ? formatInTimeZone(d, tz, "d MMM yyyy", { locale: es }) : "—";
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
       <header className="max-w-3xl">
-        <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">Clientes</h1>
+        <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">
+          Clientes · WPP
+        </h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-600 sm:text-base">
           {isPremium ? (
             <>
-              Acá tenés <strong className="font-medium text-slate-800">quiénes más te eligieron</strong>{" "}
-              y datos de contacto para seguimiento. El desglose por mes y montos está en{" "}
+              Contactos con turnos confirmados, ordenados por{" "}
+              <strong className="font-medium text-slate-800">última visita</strong>. Podés abrir
+              WPP con un clic. El desglose por mes está en{" "}
               <Link href="/dashboard/history" className="font-semibold text-teal-700 hover:underline">
                 Historial
               </Link>
@@ -68,18 +80,16 @@ export default async function ClientsPage() {
             </>
           ) : (
             <>
-              Listado de contactos que reservaron al menos una vez. El desglose por mes está en{" "}
+              Contactos con turnos confirmados, ordenados por última visita. El desglose por mes
+              está en{" "}
               <Link href="/dashboard/history" className="font-semibold text-teal-700 hover:underline">
                 Historial
               </Link>
-              . El <strong className="font-medium text-slate-800">ranking de los 5 más frecuentes</strong>{" "}
-              está incluido en el plan Premium.
+              . <strong className="font-medium text-slate-800">WPP directo</strong> con cada cliente
+              forma parte del plan Premium; para solicitarlo, comunicate con el administrador de
+              Bookment (desde la columna WPP).
             </>
           )}
-        </p>
-        <p className="mt-2 text-xs text-slate-500">
-          Vista según tu plan: <span className="font-medium text-slate-700">{planName}</span>
-          {isPremium ? " (top 5 con métricas completas)" : " (listado simplificado)"}.
         </p>
       </header>
 
@@ -87,188 +97,83 @@ export default async function ClientsPage() {
         <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-10 text-center text-sm text-slate-600">
           Todavía no hay turnos confirmados. Cuando empiecen a reservar, vas a ver los contactos acá.
         </p>
-      ) : isPremium ? (
-        <>
-          <section className="rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 shadow-md sm:p-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-900/90">
-              Los 5 que más vinieron
-            </h2>
-            <p className="mt-1 text-sm text-amber-950/85">
-              Por cantidad de turnos confirmados (histórico). Ideal para priorizar mensajes o promos.
-            </p>
-            <div className="mt-4 overflow-hidden rounded-xl border border-amber-200/80 bg-white/95">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[36rem] text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-amber-200/90 bg-amber-100/60 text-xs font-semibold uppercase tracking-wide text-amber-900/80">
-                      <th className="px-4 py-3 sm:px-5">#</th>
-                      <th className="px-4 py-3 sm:px-5">Cliente</th>
-                      <th className="px-4 py-3 sm:px-5">Visitas</th>
-                      <th className="px-4 py-3 sm:px-5">Última</th>
-                      <th className="hidden px-4 py-3 sm:table-cell sm:px-5">Primera</th>
-                      <th className="w-24 px-4 py-3 sm:px-5" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {top.map((g, idx) => {
-                      const wa = waHref(g.customerPhone, `Hola ${g.customerName}, ¿cómo estás?`);
-                      return (
-                        <tr
-                          key={`${g.customerPhone}-${g.customerName}`}
-                          className="border-b border-amber-100/70 last:border-0"
-                        >
-                          <td className="px-4 py-3 font-semibold tabular-nums text-amber-900 sm:px-5">
-                            {idx + 1}
-                          </td>
-                          <td className="px-4 py-3 sm:px-5">
-                            <p className="font-medium text-slate-900">{g.customerName}</p>
-                            <p className="text-slate-600">{g.customerPhone}</p>
-                          </td>
-                          <td className="px-4 py-3 font-semibold tabular-nums text-slate-900 sm:px-5">
-                            {g._count._all}
-                          </td>
-                          <td className="px-4 py-3 text-slate-800 sm:px-5">
-                            {dateLabel(g._max.startsAt)}
-                          </td>
-                          <td className="hidden px-4 py-3 text-slate-600 sm:table-cell sm:px-5">
-                            {dateLabel(g._min.startsAt)}
-                          </td>
-                          <td className="px-4 py-3 sm:px-5">
-                            {wa ? (
-                              <a
-                                href={wa}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-xs font-semibold text-teal-700 hover:underline"
-                              >
-                                WA
-                              </a>
-                            ) : (
-                              <span className="text-slate-300">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </section>
-
-          {rest.length > 0 ? (
-            <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                Más contactos
-              </h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Resto de personas con al menos un turno. Orden por última visita (más reciente
-                primero). Sin conteo de visitas ni primera fecha en esta tabla.
-              </p>
-              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[20rem] text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        <th className="px-4 py-3 sm:px-5">Cliente</th>
-                        <th className="px-4 py-3 sm:px-5">Última visita</th>
-                        <th className="px-4 py-3 sm:px-5">Teléfono</th>
-                        <th className="w-20 px-4 py-3 sm:px-5" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {restByLastVisit.map((g) => {
-                        const wa = waHref(g.customerPhone);
-                        return (
-                          <tr
-                            key={`${g.customerPhone}-${g.customerName}`}
-                            className="border-b border-slate-100 last:border-0"
-                          >
-                            <td className="px-4 py-3 font-medium text-slate-900 sm:px-5">
-                              {g.customerName}
-                            </td>
-                            <td className="px-4 py-3 text-slate-800 sm:px-5">
-                              {dateLabel(g._max.startsAt)}
-                            </td>
-                            <td className="px-4 py-3 text-slate-700 sm:px-5">{g.customerPhone}</td>
-                            <td className="px-4 py-3 sm:px-5">
-                              {wa ? (
-                                <a
-                                  href={wa}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-xs font-semibold text-teal-700 hover:underline"
-                                >
-                                  WA
-                                </a>
-                              ) : (
-                                <span className="text-slate-300">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              {grouped.length >= 80 ? (
-                <p className="mt-2 text-xs text-slate-500">
-                  Ranking global limitado a los 80 contactos con más visitas. Detalle por mes en
-                  Historial.
-                </p>
-              ) : null}
-            </section>
-          ) : null}
-        </>
       ) : (
-        <section className="rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 shadow-md sm:p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-900/90">
+        <section>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
             Contactos
           </h2>
-          <p className="mt-1 text-sm text-amber-950/85">
-            Ordenados por <strong className="font-medium">última visita</strong> (más reciente
-            primero). En esta vista no se muestran cantidad de visitas ni primera fecha.
-          </p>
-          <div className="mt-4 overflow-hidden rounded-xl border border-amber-200/80 bg-white/90">
+          <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[20rem] text-left text-sm">
+              <table
+                className={`w-full text-left text-sm ${isPremium ? "min-w-[42rem]" : "min-w-[32rem]"}`}
+              >
                 <thead>
-                  <tr className="border-b border-amber-200/90 bg-amber-100/50 text-xs font-semibold uppercase tracking-wide text-amber-900/80">
+                  <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                     <th className="px-4 py-3 sm:px-5">Cliente</th>
                     <th className="px-4 py-3 sm:px-5">Última visita</th>
-                    <th className="px-4 py-3 sm:px-5">Teléfono</th>
-                    <th className="w-20 px-4 py-3 sm:px-5" />
+                    {isPremium ? (
+                      <th className="px-4 py-3 sm:px-5">Visitas</th>
+                    ) : (
+                      <th className="px-4 py-3 sm:px-5">Teléfono</th>
+                    )}
+                    <th
+                      className={
+                        isPremium
+                          ? "min-w-[4.5rem] bg-violet-100/80 px-4 py-3 text-xs font-semibold uppercase tracking-wide ring-1 ring-inset ring-violet-400/85 sm:px-5"
+                          : "min-w-[4.5rem] bg-amber-100/80 px-4 py-3 text-xs font-semibold uppercase tracking-wide ring-1 ring-inset ring-amber-200/70 sm:px-5"
+                      }
+                    >
+                      {isPremium ? (
+                        <div className="flex flex-col items-center gap-1.5 normal-case">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-violet-900/90">
+                            WPP
+                          </span>
+                          <span className="inline-flex items-center gap-0.5 rounded-full border border-violet-500/60 bg-violet-200/50 px-2 py-0.5 text-[9px] font-bold tracking-wider text-violet-950">
+                            <SparkleGlyph className="h-2.5 w-2.5 shrink-0 text-violet-800" />
+                            PREMIUM
+                          </span>
+                        </div>
+                      ) : (
+                        "WPP"
+                      )}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {simpleRows.map((g) => {
-                    const wa = waHref(g.customerPhone);
+                  {rows.map((g) => {
+                    const wa = waHref(
+                      g.customerPhone,
+                      `Hola ${g.customerName}, ¿cómo estás?`,
+                    );
                     return (
                       <tr
                         key={`${g.customerPhone}-${g.customerName}`}
-                        className="border-b border-amber-100/80 last:border-0"
+                        className="border-b border-slate-100 bg-white last:border-b-0"
                       >
-                        <td className="px-4 py-3 font-medium text-slate-900 sm:px-5">
-                          {g.customerName}
+                        <td className="px-4 py-3 sm:px-5">
+                          <p className="font-medium text-slate-900">{g.customerName}</p>
+                          {isPremium ? (
+                            <p className="text-slate-600">{g.customerPhone}</p>
+                          ) : null}
                         </td>
                         <td className="px-4 py-3 text-slate-800 sm:px-5">
                           {dateLabel(g._max.startsAt)}
                         </td>
-                        <td className="px-4 py-3 text-slate-700 sm:px-5">{g.customerPhone}</td>
-                        <td className="px-4 py-3 sm:px-5">
-                          {wa ? (
-                            <a
-                              href={wa}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs font-semibold text-teal-700 hover:underline"
-                            >
-                              WA
-                            </a>
-                          ) : (
-                            <span className="text-slate-300">—</span>
-                          )}
+                        {isPremium ? (
+                          <td className="px-4 py-3 font-semibold tabular-nums text-slate-900 sm:px-5">
+                            {g._count._all}
+                          </td>
+                        ) : (
+                          <td className="px-4 py-3 text-slate-700 sm:px-5">{g.customerPhone}</td>
+                        )}
+                        <td
+                          className={
+                            isPremium
+                              ? "bg-violet-100/90 px-4 py-3 ring-1 ring-inset ring-violet-400/80 sm:px-5"
+                              : "bg-amber-100/90 px-4 py-3 ring-1 ring-inset ring-amber-200/80 sm:px-5"
+                          }
+                        >
+                          <ClientsWaCell isPremium={isPremium} href={wa} />
                         </td>
                       </tr>
                     );
@@ -277,11 +182,6 @@ export default async function ClientsPage() {
               </table>
             </div>
           </div>
-          {grouped.length >= 80 ? (
-            <p className="mt-3 text-xs text-amber-900/75">
-              Mostrando hasta 80 contactos. Más detalle en Historial.
-            </p>
-          ) : null}
         </section>
       )}
     </div>

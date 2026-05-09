@@ -53,6 +53,23 @@ export default async function PublicTenantPage({ params }: Props) {
     (await confirmedStartsThisMonthCount(tenant.id, defaultTimeZone)) >=
       plan.maxMonthlyBookings;
 
+  const staffServiceLinks =
+    tenant.sameServicesAllStaff === false && tenant.staff.length && tenant.services.length
+      ? await prisma.staffService.findMany({
+          where: {
+            staffId: { in: tenant.staff.map((s) => s.id) },
+            serviceId: { in: tenant.services.map((s) => s.id) },
+          },
+          select: { staffId: true, serviceId: true },
+        })
+      : [];
+
+  const serviceIdsByStaffId: Record<string, string[]> = {};
+  for (const l of staffServiceLinks) {
+    if (!serviceIdsByStaffId[l.staffId]) serviceIdsByStaffId[l.staffId] = [];
+    serviceIdsByStaffId[l.staffId].push(l.serviceId);
+  }
+
   return (
     <div className="min-h-full bg-slate-50">
       <main className="mx-auto max-w-5xl px-4 py-8">
@@ -73,6 +90,8 @@ export default async function PublicTenantPage({ params }: Props) {
             priceCents: s.priceCents,
           }))}
           staff={tenant.staff.map((s) => ({ id: s.id, name: s.name }))}
+          sameServicesAllStaff={tenant.sameServicesAllStaff}
+          serviceIdsByStaffId={serviceIdsByStaffId}
         />
       </main>
     </div>

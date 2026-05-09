@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { canAcceptAnotherBooking } from "@/lib/plan-limits";
 import { jsDayOfWeekForYmd, POST_SERVICE_BUFFER_MINUTES } from "@/modules/calendar/slots";
 import { defaultTimeZone } from "@/lib/timezone";
+import { staffOffersService } from "@/lib/staff-services";
 
 export type CreateBookingInput = {
   tenantId: string;
@@ -31,6 +32,22 @@ export async function createBooking(input: CreateBookingInput) {
   });
   if (!staff) {
     return { ok: false as const, code: "STAFF_NOT_FOUND" as const };
+  }
+
+  const tenantMode = await prisma.tenant.findUnique({
+    where: { id: input.tenantId },
+    select: { sameServicesAllStaff: true },
+  });
+  const shared = tenantMode?.sameServicesAllStaff ?? true;
+  const offers = await staffOffersService(
+    prisma,
+    input.tenantId,
+    shared,
+    input.staffId,
+    input.serviceId,
+  );
+  if (!offers) {
+    return { ok: false as const, code: "SERVICE_STAFF_MISMATCH" as const };
   }
 
   const endsAt = addMinutes(

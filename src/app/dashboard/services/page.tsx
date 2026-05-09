@@ -7,6 +7,7 @@ import {
 } from "@/app/dashboard/actions";
 import { CreateServicePanel } from "./create-service-panel";
 import { ServiceItemActions } from "./service-item-actions";
+import { StaffServicesPanel } from "./staff-services-panel";
 
 function suggestionsForBusinessType(businessType?: string | null) {
   const t = (businessType ?? "").toLowerCase();
@@ -42,20 +43,49 @@ function suggestionsForBusinessType(businessType?: string | null) {
   ];
 }
 
-export default async function ServicesPage() {
+export default async function ServicesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ staffServices?: string }>;
+}) {
   const session = await auth();
   const tenantId = session!.user.tenantId!;
+  const sp = searchParams ? await searchParams : {};
+  const staffServicesMsg =
+    sp.staffServices === "ok"
+      ? "Servicios del profesional guardados."
+      : sp.staffServices === "mode"
+        ? "Activá primero «Servicios distintos por profesional» y volvé a intentar."
+        : sp.staffServices === "err"
+          ? "No se pudo guardar. Revisá que el profesional siga activo."
+          : null;
 
-  const [services, tenant] = await Promise.all([
+  const [services, tenant, staffList, staffServiceLinks] = await Promise.all([
     prisma.service.findMany({
       where: { tenantId },
       orderBy: { createdAt: "desc" },
     }),
     prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { businessType: true, subscriptionTier: true },
+      select: { businessType: true, subscriptionTier: true, sameServicesAllStaff: true },
+    }),
+    prisma.staff.findMany({
+      where: { tenantId, active: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    prisma.staffService.findMany({
+      where: { staff: { tenantId, active: true } },
+      select: { staffId: true, serviceId: true },
     }),
   ]);
+
+  const selectedByStaffId: Record<string, string[]> = {};
+  for (const l of staffServiceLinks) {
+    if (!selectedByStaffId[l.staffId]) selectedByStaffId[l.staffId] = [];
+    selectedByStaffId[l.staffId].push(l.serviceId);
+  }
+  const sameServicesAllStaff = tenant?.sameServicesAllStaff ?? true;
   const suggestions = suggestionsForBusinessType(tenant?.businessType);
   const planDef = planDefinitionForTenant(tenant?.subscriptionTier ?? "simple");
   const planId = getEffectivePlanId(tenant?.subscriptionTier ?? "simple");
@@ -102,6 +132,25 @@ export default async function ServicesPage() {
   return (
     <div className="space-y-8">
       <h1 className="text-xl font-semibold text-slate-900">Servicios</h1>
+
+      {staffServicesMsg ? (
+        <p
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            sp.staffServices === "ok"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              : "border-amber-200 bg-amber-50 text-amber-950"
+          }`}
+        >
+          {staffServicesMsg}
+        </p>
+      ) : null}
+
+      <StaffServicesPanel
+        sameServicesAllStaff={sameServicesAllStaff}
+        staff={staffList}
+        services={services.filter((s) => s.active).map((s) => ({ id: s.id, name: s.name }))}
+        selectedByStaffId={selectedByStaffId}
+      />
 
       {blockNewServices ? (
         <div className="space-y-4 rounded-2xl border-2 border-amber-400 bg-amber-50/80 p-4 shadow-sm sm:p-5">

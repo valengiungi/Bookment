@@ -69,6 +69,7 @@ export async function POST(
     const map = {
       SERVICE_NOT_FOUND: 404,
       STAFF_NOT_FOUND: 404,
+      SERVICE_STAFF_MISMATCH: 400,
       CLOSED_DAY: 400,
       OUTSIDE_HOURS: 400,
       DOUBLE_BOOK: 409,
@@ -79,6 +80,7 @@ export async function POST(
     const msg: Record<keyof typeof map, string> = {
       SERVICE_NOT_FOUND: "Servicio no disponible",
       STAFF_NOT_FOUND: "Profesional no disponible",
+      SERVICE_STAFF_MISMATCH: "Este profesional no ofrece ese servicio",
       CLOSED_DAY: "Día cerrado",
       OUTSIDE_HOURS: "Fuera del horario",
       DOUBLE_BOOK: "Ese horario ya fue reservado",

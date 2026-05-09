@@ -112,6 +112,9 @@ model Tenant {
   onboardingDone   Boolean  @default(false)
   onboardingStep   Int      @default(0)
   subscriptionTier String   @default("simple")
+  /// Si es true, todos los profesionales ofrecen los mismos servicios activos (comportamiento clásico).
+  /// Si es false, solo aplican las filas en StaffService.
+  sameServicesAllStaff Boolean @default(true)
   active           Boolean  @default(true)
   /// Notas internas del super admin (no se muestran al cliente).
   adminNotes       String?
@@ -140,6 +143,7 @@ model Staff {
   bookings       Booking[]
   workingHours   WorkingHour[]
   blockedSlots   BlockedSlot[]
+  staffServices  StaffService[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -157,11 +161,23 @@ model Service {
   currency        String    @default("ARS")
   active          Boolean   @default(true)
   bookings        Booking[]
+  staffAssignments StaffService[]
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
   @@index([tenantId])
   @@index([tenantId, active])
+}
+
+/// Servicios que ofrece cada profesional (solo aplica si Tenant.sameServicesAllStaff es false).
+model StaffService {
+  staffId   String
+  serviceId String
+  staff     Staff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([staffId, serviceId])
+  @@index([serviceId])
 }
 
 model WorkingHour {
