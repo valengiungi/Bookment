@@ -57,10 +57,7 @@ export default async function DashboardLayout({
             <UserBar email={session.user.email} />
           </div>
         </div>
-        <DashboardNav
-          publicHref={`/${tenant.slug}`}
-          isPremium={getEffectivePlanId(tenant.subscriptionTier) === "premium"}
-        />
+        <DashboardNav publicHref={`/${tenant.slug}`} />
       </header>
       <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</div>
     </div>
