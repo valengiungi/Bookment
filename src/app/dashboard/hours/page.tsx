@@ -34,12 +34,19 @@ export default async function HoursPage() {
       : [{ id: "__GENERAL__", name: "Horario general del negocio" }];
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-slate-900">Horarios base</h1>
-      <p className="text-sm text-slate-600">
-        Vista simple de horarios. Tocá “Editar” para abrir el mismo menú del onboarding.
-      </p>
+    <div className="space-y-8">
+      <header className="max-w-3xl">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+          Horarios de atención
+        </h1>
+        <p className="mt-3 text-base leading-relaxed text-slate-600">
+          Definí la semana tipo de tu negocio (o de cada profesional). La grilla de abajo resume todo
+          de un vistazo; tocá <strong className="font-semibold text-slate-800">Editar horarios</strong>{" "}
+          para cambiar días y franjas — es el mismo flujo que en el alta inicial.
+        </p>
+      </header>
 
+      <div className="space-y-6">
       {groups.map((group) => {
         const staffId = group.id === "__GENERAL__" ? null : group.id;
         const rows = allHours
@@ -71,6 +78,7 @@ export default async function HoursPage() {
           />
         );
       })}
+      </div>
     </div>
   );
 }
