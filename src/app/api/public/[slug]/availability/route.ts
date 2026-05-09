@@ -4,10 +4,13 @@ import { NextResponse } from "next/server";
 import { BookingStatus } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma";
 import { isReservedSlug } from "@/lib/reserved-slugs";
+import { confirmedStartsThisMonthCount } from "@/lib/plan-limits";
+import { planDefinitionForTenant } from "@/lib/plans";
 import { defaultTimeZone } from "@/lib/timezone";
 import { buildSlotStarts, getStaffDayWindow, jsDayOfWeekForYmd } from "@/modules/calendar/slots";
 
-export type PublicDayStatus = "past" | "closed" | "full" | "open";
+/** `monthly_cap`: cupo mensual de reservas web agotado (plan Simple). */
+export type PublicDayStatus = "past" | "closed" | "full" | "open" | "monthly_cap";
 
 function busyForStaffDay(
   staffId: string,
@@ -63,6 +66,7 @@ export async function GET(
       month: monthRaw,
       timeZone: defaultTimeZone,
       todayYmd: formatInTimeZone(new Date(), defaultTimeZone, "yyyy-MM-dd"),
+      monthlyQuotaBlocked: false,
       days: {},
     });
   }
@@ -70,6 +74,13 @@ export async function GET(
   const tz = defaultTimeZone;
   const now = new Date();
   const todayYmd = formatInTimeZone(now, tz, "yyyy-MM-dd");
+
+  const plan = planDefinitionForTenant(tenant.subscriptionTier);
+  let monthlyQuotaBlocked = false;
+  if (plan.maxMonthlyBookings != null) {
+    const used = await confirmedStartsThisMonthCount(tenant.id, tz);
+    monthlyQuotaBlocked = used >= plan.maxMonthlyBookings;
+  }
   const [yStr, mStr] = monthRaw.split("-");
   const year = Number(yStr);
   const mm = mStr;
@@ -146,7 +157,8 @@ export async function GET(
     if (!anyStaffWorks) {
       days[dateYmd] = "closed";
     } else if (anySlot) {
-      days[dateYmd] = "open";
+      days[dateYmd] =
+        monthlyQuotaBlocked && dateYmd >= todayYmd ? "monthly_cap" : "open";
     } else {
       days[dateYmd] = "full";
     }
@@ -158,6 +170,7 @@ export async function GET(
     month: monthRaw,
     timeZone: tz,
     todayYmd,
+    monthlyQuotaBlocked,
     firstWeekdayMon0: (jsDayOfWeekForYmd(`${year}-${mm}-01`, tz) + 6) % 7,
     daysInMonth: Number(formatInTimeZone(addDays(nextMonthStart, -1), tz, "d")),
     days,

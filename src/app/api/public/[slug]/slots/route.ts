@@ -5,6 +5,7 @@ import { BookingStatus } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma";
 import { isReservedSlug } from "@/lib/reserved-slugs";
 import { defaultTimeZone } from "@/lib/timezone";
+import { canAcceptAnotherBooking } from "@/lib/plan-limits";
 import { buildSlotStarts, formatSlotLabel } from "@/modules/calendar/slots";
 
 export async function GET(
@@ -47,6 +48,12 @@ export async function GET(
   }
 
   const tz = defaultTimeZone;
+
+  const quotaOk = await canAcceptAnotherBooking(tenant.id, tenant.subscriptionTier, tz);
+  if (!quotaOk) {
+    return NextResponse.json({ slots: [], monthlyQuotaBlocked: true });
+  }
+
   const dayStart = toDate(`${dateYmd}T00:00:00`, { timeZone: tz });
   const dayEnd = addDays(dayStart, 1);
 

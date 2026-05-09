@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { LockIcon, PremiumActiveBadge, PremiumLockedTeaser } from "@/components/premium-visuals";
 
 export function HistorySummaryTabs(props: {
   monthLabel: string;
@@ -30,6 +31,10 @@ export function HistorySummaryTabs(props: {
     tab === "month" ? "Balance del mes (estimado)" : "Balance histórico total (estimado)";
   const avgLabel = tab === "month" ? "Promedio por turno (mes)" : "Promedio por turno (histórico)";
 
+  const premiumCard =
+    !props.insightsLocked &&
+    "rounded-xl border border-violet-200/90 bg-gradient-to-br from-violet-50/90 to-white p-4 shadow-sm ring-1 ring-violet-200/70";
+
   return (
     <div className="space-y-10">
       <section className="space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -57,8 +62,11 @@ export function HistorySummaryTabs(props: {
         </div>
 
         {tab === "month" ? (
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-lg font-semibold capitalize text-slate-900">{props.monthLabel}</h2>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-semibold capitalize text-slate-900">{props.monthLabel}</h2>
+              {!props.insightsLocked ? <PremiumActiveBadge /> : null}
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href={props.prevMonthHref}
@@ -77,7 +85,10 @@ export function HistorySummaryTabs(props: {
             </div>
           </div>
         ) : (
-          <h2 className="text-lg font-semibold text-slate-900">Todo el historial</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-semibold text-slate-900">Todo el historial</h2>
+            {!props.insightsLocked ? <PremiumActiveBadge /> : null}
+          </div>
         )}
 
         <div className="grid gap-4 sm:grid-cols-3">
@@ -86,60 +97,86 @@ export function HistorySummaryTabs(props: {
               Turnos confirmados
             </p>
             <p className="mt-2 text-2xl font-bold tabular-nums text-slate-900">{cuts}</p>
+            <p className="mt-2 text-[11px] text-slate-500">Incluido en todos los planes</p>
           </div>
           <div
             className={`rounded-xl border p-4 ${
               props.insightsLocked
-                ? "border-amber-200 bg-amber-50/80"
-                : "border-teal-100 bg-teal-50/60"
+                ? "border-amber-300 border-dashed bg-amber-50/90"
+                : premiumCard
             }`}
           >
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-600">
+            <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-600">
+              {props.insightsLocked ? <LockIcon className="h-3.5 w-3.5" /> : null}
               {balanceLabel}
             </p>
             {props.insightsLocked ? (
               <p className="mt-2 text-sm font-medium leading-snug text-amber-950">
-                Incluido en Premium (precios cargados en cada servicio).
+                Ves montos estimados y comparativas con <strong>Premium</strong> (precios por
+                servicio).
               </p>
             ) : (
-              <p className="mt-2 text-2xl font-bold tabular-nums text-teal-950">{revenue}</p>
+              <p className="mt-2 text-2xl font-bold tabular-nums text-violet-950">{revenue}</p>
             )}
           </div>
           <div
             className={`rounded-xl border p-4 ${
-              props.insightsLocked ? "border-slate-100 bg-slate-50" : "border-slate-100 bg-slate-50"
+              props.insightsLocked
+                ? "border-amber-300 border-dashed bg-amber-50/90"
+                : premiumCard
             }`}
           >
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-600">
+              {props.insightsLocked ? <LockIcon className="h-3.5 w-3.5" /> : null}
               {avgLabel}
             </p>
             {props.insightsLocked ? (
-              <p className="mt-2 text-sm text-slate-500">—</p>
+              <p className="mt-2 text-sm text-amber-950/90">Promedio por turno — mismo pack Premium.</p>
             ) : (
-              <p className="mt-2 text-2xl font-bold tabular-nums text-slate-900">{avgAmount}</p>
+              <p className="mt-2 text-2xl font-bold tabular-nums text-violet-950">{avgAmount}</p>
             )}
           </div>
         </div>
-
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <h3 className="text-sm font-semibold text-slate-900">{topTitle}</h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-semibold text-slate-900">{topTitle}</h3>
+          {!props.insightsLocked ? <PremiumActiveBadge /> : null}
+        </div>
         <p className="mt-1 text-xs text-slate-500">
-          Quienes más turnos sacaron en el período elegido (solo Premium).
+          {props.insightsLocked
+            ? "Ordená tu negocio viendo quiénes más te consumen turnos."
+            : "Datos premium: quiénes más te eligen en el período."}
         </p>
 
         {props.insightsLocked ? (
-          <p className="mt-4 rounded-lg border border-amber-100 bg-amber-50/90 px-4 py-3 text-sm text-amber-950">
-            Ranking de clientes y montos estimados son parte del plan <strong>Premium</strong>.
-          </p>
+          <div className="mt-4">
+            <PremiumLockedTeaser
+              title="Ranking de mejores clientes — incluido en Premium"
+              footnote="Subiendo de plan ves el top con nombre, teléfono y cantidad de turnos, para premiar fidelidad o remarketing."
+            >
+              <p className="flex items-start gap-2">
+                <span className="text-violet-600" aria-hidden>
+                  ✓
+                </span>
+                Top clientes del mes y del histórico completo.
+              </p>
+              <p className="flex items-start gap-2">
+                <span className="text-violet-600" aria-hidden>
+                  ✓
+                </span>
+                Ideal para campañas y para saber en quién invertir tiempo.
+              </p>
+            </PremiumLockedTeaser>
+          </div>
         ) : topItems.length === 0 ? (
           <p className="mt-4 text-sm text-slate-500">Todavía no hay reservas confirmadas.</p>
         ) : (
-          <div className="mt-6 overflow-x-auto rounded-xl border border-slate-200">
+          <div className="mt-6 overflow-x-auto rounded-xl border border-violet-200 bg-violet-50/20 ring-1 ring-violet-200/60">
             <table className="w-full min-w-[320px] border-collapse text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+                <tr className="border-b border-violet-200 bg-violet-100/80 text-left text-xs font-semibold uppercase tracking-wide text-violet-950">
                   <th className="px-4 py-3">#</th>
                   <th className="px-4 py-3">Cliente</th>
                   <th className="px-4 py-3">Teléfono</th>
@@ -150,12 +187,12 @@ export function HistorySummaryTabs(props: {
                 {topItems.map((c, idx) => (
                   <tr
                     key={`${c.customerPhone}-${idx}`}
-                    className="border-b border-slate-100 last:border-0 odd:bg-white even:bg-slate-50/50"
+                    className="border-b border-violet-100/80 last:border-0 odd:bg-white even:bg-violet-50/40"
                   >
                     <td className="px-4 py-3.5 tabular-nums text-slate-500">{idx + 1}</td>
                     <td className="px-4 py-3.5 font-medium text-slate-900">{c.customerName}</td>
                     <td className="px-4 py-3.5 text-slate-600">{c.customerPhone}</td>
-                    <td className="px-4 py-3.5 text-right font-semibold tabular-nums text-slate-900">
+                    <td className="px-4 py-3.5 text-right font-semibold tabular-nums text-violet-950">
                       {c.count}
                     </td>
                   </tr>

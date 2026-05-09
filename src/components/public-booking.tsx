@@ -20,7 +20,7 @@ type Service = {
 
 type Staff = { id: string; name: string };
 
-type DayStatus = "past" | "closed" | "full" | "open";
+type DayStatus = "past" | "closed" | "full" | "open" | "monthly_cap";
 
 type Slot = { startsAt: string; label: string };
 
@@ -42,12 +42,24 @@ const cellClass: Record<DayStatus, string> = {
   past: "cursor-not-allowed bg-slate-200 text-slate-500",
   closed: "cursor-not-allowed bg-slate-200 text-slate-500",
   full: "cursor-not-allowed bg-rose-100 text-rose-900 ring-1 ring-rose-200/80",
+  monthly_cap:
+    "cursor-not-allowed bg-amber-50 text-amber-950 ring-1 ring-amber-200/90",
   open: "cursor-pointer bg-emerald-100 text-emerald-900 ring-1 ring-emerald-300/80 hover:bg-emerald-200",
 };
+
+function whatsappCoordinationHref(businessWhatsapp: string) {
+  const num = businessWhatsapp.replace(/\D/g, "");
+  if (!num) return null;
+  const text =
+    "Hola, quería coordinar un turno (desde la web dice que este mes ya no hay más cupo online).";
+  return `https://wa.me/${num}?text=${encodeURIComponent(text)}`;
+}
 
 export function PublicBooking(props: {
   slug: string;
   whatsapp: string;
+  /** Plan Simple: cupo mensual de reservas web agotado (servidor + API coinciden). */
+  monthlyQuotaBlocked?: boolean;
   /** Si es false (plan Simple), no se abre ni se ofrece WhatsApp al negocio tras reservar. */
   notifyBusinessOnBooking: boolean;
   businessName: string;
@@ -72,6 +84,9 @@ export function PublicBooking(props: {
   const [daysInMonth, setDaysInMonth] = useState(31);
   const [todayYmd, setTodayYmd] = useState(() => nowInit.toISOString().slice(0, 10));
   const [calendarLoading, setCalendarLoading] = useState(true);
+  const [monthlyQuotaBlocked, setMonthlyQuotaBlocked] = useState(
+    props.monthlyQuotaBlocked === true,
+  );
 
   const [selectedYmd, setSelectedYmd] = useState<string | null>(null);
   const [serviceId, setServiceId] = useState(props.services[0]?.id ?? "");
@@ -118,6 +133,9 @@ export function PublicBooking(props: {
         return;
       }
       if (data.todayYmd) setTodayYmd(data.todayYmd);
+      if (typeof data.monthlyQuotaBlocked === "boolean") {
+        setMonthlyQuotaBlocked(data.monthlyQuotaBlocked);
+      }
       if (typeof data.firstWeekdayMon0 === "number") setFirstPad(data.firstWeekdayMon0);
       if (typeof data.daysInMonth === "number") setDaysInMonth(data.daysInMonth);
       setDayMap(typeof data.days === "object" && data.days ? data.days : {});
@@ -303,6 +321,7 @@ export function PublicBooking(props: {
   const subtitle = [props.businessType, props.location]
     .filter((s): s is string => Boolean(s && s.trim()))
     .join(", ");
+  const coordinationWa = whatsappCoordinationHref(props.whatsapp);
 
   return (
     <div className="relative space-y-10">
@@ -330,6 +349,36 @@ export function PublicBooking(props: {
           )}
         </div>
       </header>
+
+      {monthlyQuotaBlocked ? (
+        <div
+          className="rounded-2xl border border-amber-300 bg-amber-50/95 px-4 py-4 text-sm text-amber-950 shadow-sm sm:px-5"
+          role="status"
+        >
+          <p className="font-semibold">Este mes no hay más turnos disponibles por la web</p>
+          <p className="mt-2 leading-relaxed text-amber-950/95">
+            El profesional ya no puede recibir más reservas por la página: llegó al máximo de turnos
+            online de su plan para este mes calendario.
+          </p>
+          {coordinationWa ? (
+            <>
+              <p className="mt-3 font-medium text-amber-950">Coordiná por WhatsApp:</p>
+              <a
+                href={coordinationWa}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-flex min-h-10 items-center justify-center rounded-xl bg-amber-600 px-4 text-sm font-semibold text-white hover:bg-amber-700"
+              >
+                Abrir WhatsApp
+              </a>
+            </>
+          ) : (
+            <p className="mt-3 text-xs leading-relaxed text-amber-900/90">
+              Si tenés el WhatsApp o teléfono del negocio, contactalo por ahí para ver disponibilidad.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       <div className="mx-auto w-full max-w-lg">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
@@ -376,6 +425,10 @@ export function PublicBooking(props: {
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-3 w-3 rounded bg-rose-100 ring-1 ring-rose-200/80" />
                 Completo
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-3 w-3 rounded bg-amber-50 ring-1 ring-amber-200/90" />
+                Sin cupo web
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-3 w-3 rounded bg-emerald-100 ring-1 ring-emerald-300/80" />

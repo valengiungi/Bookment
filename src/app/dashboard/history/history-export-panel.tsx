@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useToast } from "@/components/toast";
+import { PremiumActiveBadge, PremiumLockedTeaser } from "@/components/premium-visuals";
 
 export function HistoryExportPanel({ enabled }: { enabled: boolean }) {
   const [loading, setLoading] = useState(false);
@@ -41,17 +42,17 @@ export function HistoryExportPanel({ enabled }: { enabled: boolean }) {
 
   if (enabled) {
     return (
-      <div className="rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-white p-5 shadow-sm sm:p-6">
+      <div className="rounded-2xl border-2 border-violet-300/90 bg-gradient-to-br from-violet-50 via-white to-violet-50/80 p-5 shadow-md shadow-violet-900/5 ring-1 ring-violet-200/70 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0 space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-wide text-violet-800">
-              Plan Premium
-            </p>
-            <p className="text-base font-semibold text-slate-900">Descarga para Excel</p>
-            <p className="text-sm leading-relaxed text-slate-600">
-              Archivo <strong>Excel .xlsx</strong>: hoja &quot;Turnos&quot; con columnas, filtros y
-              formato listo para imprimir o compartir; hoja &quot;Balance&quot; con totales
-              estimados.
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <PremiumActiveBadge />
+              <p className="text-base font-semibold text-slate-900">Descarga para Excel</p>
+            </div>
+            <p className="text-sm leading-relaxed text-slate-700">
+              Archivo <strong className="text-violet-950">Excel .xlsx</strong>: hoja{" "}
+              <em>Turnos</em> con columnas, filtros y formato profesional; hoja{" "}
+              <em>Balance</em> con totales estimados.
             </p>
           </div>
           <button
@@ -68,9 +69,22 @@ export function HistoryExportPanel({ enabled }: { enabled: boolean }) {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-600">
-      <span className="font-medium text-slate-800">Descarga Excel:</span> disponible en{" "}
-      <strong>Premium</strong>. Pedilo a quien administra Bookment.
-    </div>
+    <PremiumLockedTeaser
+      title="Descarga profesional en Excel — disponible en Premium"
+      footnote="Pedí el upgrade a quien administra Bookment: pasás a tener el mismo archivo que ves arriba, listo para contadores o para tu propio control."
+    >
+      <p className="flex items-start gap-2">
+        <span className="mt-0.5 text-violet-600" aria-hidden>
+          ✓
+        </span>
+        Tablas con bordes, totales y dos hojas (turnos + balance).
+      </p>
+      <p className="flex items-start gap-2">
+        <span className="mt-0.5 text-violet-600" aria-hidden>
+          ✓
+        </span>
+        Compatible con Excel y Google Sheets.
+      </p>
+    </PremiumLockedTeaser>
   );
 }
