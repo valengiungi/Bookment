@@ -43,15 +43,28 @@ async function PricingCards() {
   );
 }
 
-const industries = [
-  "Belleza y estética",
-  "Salud y bienestar",
-  "Legal y consultoría",
-  "Fitness y coaching",
-  "Tatuajes y arte",
-  "Educación y terapias",
-  "Servicios técnicos",
-  "Cualquier agenda por turnos",
+/** Antes / ahora: tono profesional; detalle de Excel y avisos alineado al producto. */
+const frictionRows: [string, string][] = [
+  [
+    "Reservas que se pierden en la coordinación por canales de mensajería.",
+    "Página pública con horarios reales: tus clientes reservan con claridad, sin depender de tu respuesta inmediata.",
+  ],
+  [
+    "Tiempo operativo consumido en consultas repetitivas de disponibilidad.",
+    "El cliente elige servicio, profesional y horario en un solo lugar.",
+  ],
+  [
+    "Errores cotidianos en agendas manuales: cruces de horario, huecos o anotaciones descoordinadas.",
+    "Agenda profesional sin doble reserva y alineada con bloqueos y reglas de atención.",
+  ],
+  [
+    "Cierre de mes con información dispersa entre planillas y archivos sueltos.",
+    "Historial con totales y promedios en el mismo panel; exportación a Excel con turnos y balance para presentar o archivar.",
+  ],
+  [
+    "Enterarte de una confirmación nueva con demora.",
+    "Aviso al negocio por WhatsApp cuando alguien confirma una reserva desde tu link público.",
+  ],
 ];
 
 export default async function HomePage() {
@@ -61,10 +74,7 @@ export default async function HomePage() {
       <main className="flex-1">
         <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="text-sm font-medium uppercase tracking-wide text-teal-700">
-              Reservas sin fricción
-            </p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
+            <h1 className="text-4xl font-medium tracking-tight text-teal-600 sm:text-5xl">
               Automatizá tus reservas
             </h1>
             <p className="mt-4 text-lg leading-relaxed text-slate-600">
@@ -91,24 +101,43 @@ export default async function HomePage() {
         <section className="border-y border-slate-200 bg-white py-16 sm:py-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <h2 className="text-center text-2xl font-semibold text-slate-900">
-              Problemas que dejás atrás
+              Cómo era antes y cómo es ahora
             </h2>
-            <ul className="mx-auto mt-10 grid max-w-3xl gap-4 sm:grid-cols-2">
-              {[
-                "Pérdida de turnos por demoras al responder",
-                "Mensajes manuales que repiten lo mismo todo el día",
-                "Desorganización entre equipo y distintos canales",
-                "Cancelaciones de último momento sin aviso",
-              ].map((t) => (
-                <li
-                  key={t}
-                  className="flex gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4 text-slate-700"
-                >
-                  <span className="mt-0.5 text-teal-600">✓</span>
-                  <span>{t}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="mx-auto mt-10 max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[32rem] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50">
+                      <th className="px-4 py-3.5 font-semibold text-slate-900 sm:px-6">
+                        Cómo era antes
+                      </th>
+                      <th className="px-4 py-3.5 font-semibold text-teal-800 sm:px-6">
+                        Cómo es con Bookment
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {frictionRows.map(([before, after], i) => (
+                      <tr
+                        key={before}
+                        className={
+                          i % 2 === 0
+                            ? "border-b border-slate-100 bg-white"
+                            : "border-b border-slate-100 bg-slate-50/60"
+                        }
+                      >
+                        <td className="px-4 py-3.5 align-top text-slate-700 sm:px-6 sm:py-4">
+                          {before}
+                        </td>
+                        <td className="px-4 py-3.5 align-top text-slate-800 sm:px-6 sm:py-4">
+                          <span className="font-medium text-slate-900">{after}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -139,28 +168,6 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section className="border-y border-slate-200 bg-white py-16 sm:py-20">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            <h2 className="text-center text-2xl font-semibold text-slate-900">
-              Rubros compatibles
-            </h2>
-            <p className="mx-auto mt-3 max-w-2xl text-center text-slate-600">
-              El mismo producto para negocios que viven de la agenda. Sin verticales rígidos: vos
-              definís servicios y disponibilidad.
-            </p>
-            <div className="mx-auto mt-10 flex max-w-4xl flex-wrap justify-center gap-2">
-              {industries.map((label) => (
-                <span
-                  key={label}
-                  className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700"
-                >
-                  {label}
-                </span>
-              ))}
-            </div>
-          </div>
-        </section>
-
         <section className="py-16 sm:py-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <h2 className="text-center text-2xl font-semibold text-slate-900">Precios</h2>
@@ -178,20 +185,20 @@ export default async function HomePage() {
             <dl className="mt-10 space-y-6">
               {[
                 [
-                  "¿Sirve para mi rubro?",
-                  "Sí. Si trabajás con turnos y servicios con duración, podés configurarlo. No es un sistema médico ni un ERP: está enfocado en reservas.",
+                  "¿Puedo empezar rápido sin configurar todo de una?",
+                  "Sí. Podés cargar lo básico (servicios, horarios y al menos un profesional) y compartir tu link el mismo día. Después ajustás detalles desde el panel.",
                 ],
                 [
-                  "¿Cada negocio tiene su propia página?",
-                  "Cada cliente obtiene un link público tipo tudominio.com/su-marca para que sus pacientes o clientes reserven solos.",
+                  "¿Cómo evita errores en la agenda?",
+                  "La disponibilidad se calcula con tus horarios y bloqueos activos. Si un horario ya está tomado, no vuelve a ofrecerse para reservar.",
                 ],
                 [
-                  "¿Puedo tener varios profesionales?",
-                  "Cada miembro del equipo tiene su agenda. Los clientes eligen quién los atiende cuando corresponde.",
+                  "¿Qué información puedo revisar para cerrar el mes?",
+                  "En Historial ves turnos, totales y promedios, y podés exportar un archivo de trabajo con el detalle de reservas y balance para análisis administrativo.",
                 ],
                 [
-                  "¿Qué pasa con los choques de horario?",
-                  "El sistema evita doble reserva, respeta bloqueos, feriados o vacaciones que cargues, y horarios fuera de atención.",
+                  "¿Cómo me entero cuando entra una reserva nueva?",
+                  "Cuando está habilitado, el sistema envía aviso por WhatsApp al negocio al momento de la confirmación para que no se te pase ninguna reserva.",
                 ],
               ].map(([q, a]) => (
                 <div key={q} className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4">
