@@ -6,25 +6,29 @@ type SaveAction = (formData: FormData) => Promise<void>;
 
 export function PerStaffServiceForm({
   staffId,
-  staffName,
   services,
   initialServiceIds,
   saveAction,
+  showHeader = true,
+  staffName,
+  formClassName = "",
 }: {
   staffId: string;
-  staffName: string;
+  staffName?: string;
   services: { id: string; name: string }[];
   initialServiceIds: string[];
   saveAction: SaveAction;
+  /** Si es false, solo checkboxes + guardar (el título va afuera). */
+  showHeader?: boolean;
+  formClassName?: string;
 }) {
   const selectionKey = [...initialServiceIds].sort().join("|");
 
   if (services.length === 0) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-        <h3 className="text-sm font-semibold text-slate-900">{staffName}</h3>
-        <p className="mt-2 text-xs text-slate-500">No hay servicios activos todavía.</p>
-      </div>
+      <p className="text-sm text-slate-500">
+        No hay servicios activos en el catálogo. Agregá servicios arriba.
+      </p>
     );
   }
 
@@ -32,16 +36,20 @@ export function PerStaffServiceForm({
     <form
       key={`${staffId}-${selectionKey}`}
       action={saveAction}
-      className="rounded-xl border border-slate-200 bg-slate-50/50 p-4"
+      className={formClassName}
     >
       <input type="hidden" name="staffId" value={staffId} />
-      <h3 className="text-sm font-semibold text-slate-900">{staffName}</h3>
-      <ul className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+      {showHeader && staffName ? (
+        <h3 className="text-sm font-semibold text-slate-900">{staffName}</h3>
+      ) : null}
+      <ul
+        className={`flex flex-col gap-2 sm:flex-row sm:flex-wrap ${showHeader ? "mt-3" : ""}`}
+      >
         {services.map((svc) => {
           const checked = initialServiceIds.includes(svc.id);
           return (
             <li key={svc.id}>
-              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50">
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 hover:border-slate-300 hover:bg-white">
                 <input
                   type="checkbox"
                   name="serviceId"
@@ -55,11 +63,13 @@ export function PerStaffServiceForm({
           );
         })}
       </ul>
-      <FormSubmitButton
-        idleText="Guardar servicios de este profesional"
-        loadingText="Guardando…"
-        className="mt-3 rounded-lg bg-teal-600 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-700"
-      />
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <FormSubmitButton
+          idleText="Guardar cambios"
+          loadingText="Guardando…"
+          className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700"
+        />
+      </div>
     </form>
   );
 }

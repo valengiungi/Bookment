@@ -1,6 +1,6 @@
 import { FormSubmitButton } from "@/components/form-submit-button";
 import { setServicesAssignmentMode, updateStaffServiceAssignments } from "@/app/dashboard/actions";
-import { PerStaffServiceForm } from "./per-staff-service-form";
+import { StaffProfessionalServicesRow } from "./staff-professional-services-row";
 
 export function StaffServicesPanel({
   sameServicesAllStaff,
@@ -59,18 +59,19 @@ export function StaffServicesPanel({
       </div>
 
       {!sameServicesAllStaff ? (
-        <div className="mt-6 space-y-5 border-t border-slate-100 pt-5">
-          <p className="text-xs text-slate-500">
-            Marcá qué servicios ofrece cada profesional y guardá por persona. Al activar este modo,
-            arrancamos con todos los servicios activos en todos; después podés ajustar.
+        <div className="mt-6 space-y-4 border-t border-slate-100 pt-5">
+          <p className="text-sm text-slate-600">
+            Cada tarjeta muestra los servicios públicos de ese profesional. Usá{" "}
+            <strong className="font-medium text-slate-800">Editar servicios</strong> solo cuando
+            quieras cambiar la lista.
           </p>
           {staff.map((s) => (
-            <PerStaffServiceForm
+            <StaffProfessionalServicesRow
               key={s.id}
               staffId={s.id}
               staffName={s.name}
               services={services}
-              initialServiceIds={selectedByStaffId[s.id] ?? []}
+              assignedServiceIds={selectedByStaffId[s.id] ?? []}
               saveAction={updateStaffServiceAssignments}
             />
           ))}
