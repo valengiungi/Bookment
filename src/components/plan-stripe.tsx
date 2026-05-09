@@ -72,10 +72,6 @@ export function PlanStripe({
           )}
         </span>
       </p>
-      <p className="mx-auto mt-1 max-w-3xl text-xs leading-snug text-slate-600">
-        Sin aviso por WhatsApp al negocio al reservar por el link. Premium: insights en Historial,
-        descarga Excel y aviso al negocio.
-      </p>
       <ul className="mx-auto mt-2 flex max-w-2xl flex-wrap justify-center gap-x-6 gap-y-2 text-xs text-slate-600">
         <li className="flex items-center gap-1.5">
           <LockIcon className="h-3.5 w-3.5 text-amber-700/90" />
