@@ -26,14 +26,14 @@ export function HistoryExportPanel({ enabled }: { enabled: boolean }) {
       const blob = await res.blob();
       const cd = res.headers.get("Content-Disposition");
       const match = cd?.match(/filename="([^"]+)"/);
-      const filename = match?.[1] ?? "historial-reservas.csv";
+      const filename = match?.[1] ?? "historial-reservas.xlsx";
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
-      showToast("Listo: archivo para Excel / Google Sheets", "success");
+      showToast("Listo: descargaste un Excel (.xlsx) con turnos y balance", "success");
     } finally {
       setLoading(false);
     }
@@ -49,8 +49,9 @@ export function HistoryExportPanel({ enabled }: { enabled: boolean }) {
             </p>
             <p className="text-base font-semibold text-slate-900">Descarga para Excel</p>
             <p className="text-sm leading-relaxed text-slate-600">
-              Exportá todas las reservas confirmadas en un archivo .csv (abrilo en Excel o Google
-              Sheets). Incluye total de turnos y total estimado al final.
+              Archivo <strong>Excel .xlsx</strong>: hoja &quot;Turnos&quot; con columnas, filtros y
+              formato listo para imprimir o compartir; hoja &quot;Balance&quot; con totales
+              estimados.
             </p>
           </div>
           <button
@@ -59,7 +60,7 @@ export function HistoryExportPanel({ enabled }: { enabled: boolean }) {
             onClick={() => void onDownload()}
             className="shrink-0 rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-violet-700 disabled:opacity-50"
           >
-            {loading ? "Generando archivo…" : "Descargar tabla"}
+            {loading ? "Generando Excel…" : "Descargar Excel"}
           </button>
         </div>
       </div>
