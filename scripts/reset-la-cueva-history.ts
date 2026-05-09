@@ -1,6 +1,6 @@
 /**
- * Borra todos los turnos de "La Cueva" (slug emi-barber o nombre) y crea unos pocos
- * confirmados en meses pasados (historial de ejemplo).
+ * Borra todos los turnos de "La Cueva" (slug emi-barber o nombre) y crea turnos de ejemplo
+ * en meses pasados, con volumen desigual por mes (algunos meses más cargados que otros).
  *
  *   npx tsx scripts/reset-la-cueva-history.ts
  */
@@ -57,20 +57,46 @@ async function main() {
     process.exit(1);
   }
 
-  const service = services[0]!;
-  const staff = staffList[0]!;
-  const blockMinutes = service.durationMinutes + BUFFER_MIN;
-
+  /** Enero liviano, febrero medio, marzo pico, abril fuerte, mayo arranque suave */
   const samples: { ymd: string; time: string; customerName: string; customerPhone: string }[] = [
-    { ymd: "2026-02-04", time: "10:30", customerName: "María González", customerPhone: "+54 9 11 5001-2200" },
-    { ymd: "2026-02-18", time: "15:00", customerName: "Lucas Pérez", customerPhone: "+54 9 11 5001-2201" },
-    { ymd: "2026-03-07", time: "11:15", customerName: "Ana Ferreyra", customerPhone: "+54 9 11 5001-2202" },
-    { ymd: "2026-03-21", time: "09:30", customerName: "Diego Ríos", customerPhone: "+54 9 11 5001-2203" },
-    { ymd: "2026-04-02", time: "16:45", customerName: "Carla Méndez", customerPhone: "+54 9 11 5001-2204" },
-    { ymd: "2026-04-19", time: "14:00", customerName: "Federico Costa", customerPhone: "+54 9 11 5001-2205" },
+    // 2026-01 — 2
+    { ymd: "2026-01-08", time: "10:00", customerName: "María González", customerPhone: "+54 9 11 5001-2200" },
+    { ymd: "2026-01-22", time: "17:30", customerName: "Lucas Pérez", customerPhone: "+54 9 11 5001-2201" },
+    // 2026-02 — 4
+    { ymd: "2026-02-04", time: "10:30", customerName: "Ana Ferreyra", customerPhone: "+54 9 11 5001-2202" },
+    { ymd: "2026-02-11", time: "12:00", customerName: "Diego Ríos", customerPhone: "+54 9 11 5001-2203" },
+    { ymd: "2026-02-18", time: "15:00", customerName: "Carla Méndez", customerPhone: "+54 9 11 5001-2204" },
+    { ymd: "2026-02-27", time: "09:00", customerName: "Federico Costa", customerPhone: "+54 9 11 5001-2205" },
+    // 2026-03 — 12 (mes más cargado)
+    { ymd: "2026-03-03", time: "09:30", customerName: "Valentina Sosa", customerPhone: "+54 9 11 5001-2206" },
+    { ymd: "2026-03-05", time: "11:00", customerName: "Martín Ibáñez", customerPhone: "+54 9 11 5001-2207" },
+    { ymd: "2026-03-07", time: "11:15", customerName: "Julieta Morán", customerPhone: "+54 9 11 5001-2208" },
+    { ymd: "2026-03-10", time: "16:00", customerName: "Nicolás Vega", customerPhone: "+54 9 11 5001-2209" },
+    { ymd: "2026-03-12", time: "10:45", customerName: "Paula Domínguez", customerPhone: "+54 9 11 5001-2210" },
+    { ymd: "2026-03-14", time: "14:30", customerName: "Santiago Ruiz", customerPhone: "+54 9 11 5001-2211" },
+    { ymd: "2026-03-18", time: "09:15", customerName: "Camila Ortiz", customerPhone: "+54 9 11 5001-2212" },
+    { ymd: "2026-03-19", time: "17:00", customerName: "Tomás Benítez", customerPhone: "+54 9 11 5001-2213" },
+    { ymd: "2026-03-21", time: "09:30", customerName: "Florencia Núñez", customerPhone: "+54 9 11 5001-2214" },
+    { ymd: "2026-03-25", time: "12:30", customerName: "Gonzalo Prieto", customerPhone: "+54 9 11 5001-2215" },
+    { ymd: "2026-03-28", time: "15:45", customerName: "Micaela López", customerPhone: "+54 9 11 5001-2216" },
+    { ymd: "2026-03-31", time: "11:00", customerName: "Bruno Acosta", customerPhone: "+54 9 11 5001-2217" },
+    // 2026-04 — 5
+    { ymd: "2026-04-02", time: "16:45", customerName: "Agustina Rey", customerPhone: "+54 9 11 5001-2218" },
+    { ymd: "2026-04-08", time: "10:00", customerName: "Leandro Funes", customerPhone: "+54 9 11 5001-2219" },
+    { ymd: "2026-04-12", time: "13:15", customerName: "Rocío Peralta", customerPhone: "+54 9 11 5001-2220" },
+    { ymd: "2026-04-19", time: "14:00", customerName: "Emiliano Ramos", customerPhone: "+54 9 11 5001-2221" },
+    { ymd: "2026-04-26", time: "09:45", customerName: "Delfina Castro", customerPhone: "+54 9 11 5001-2222" },
+    // 2026-05 — 3 (primeros días, antes de “hoy” típico demo)
+    { ymd: "2026-05-02", time: "10:30", customerName: "Iván Molina", customerPhone: "+54 9 11 5001-2223" },
+    { ymd: "2026-05-04", time: "11:30", customerName: "Lorena Cabrera", customerPhone: "+54 9 11 5001-2224" },
+    { ymd: "2026-05-06", time: "16:00", customerName: "Hernán Suárez", customerPhone: "+54 9 11 5001-2225" },
   ];
 
-  for (const s of samples) {
+  for (let i = 0; i < samples.length; i++) {
+    const s = samples[i]!;
+    const service = services[i % services.length]!;
+    const staff = staffList[i % staffList.length]!;
+    const blockMinutes = service.durationMinutes + BUFFER_MIN;
     const startsAt = toDate(`${s.ymd}T${s.time}:00`, { timeZone: TZ });
     const endsAt = addMinutes(startsAt, blockMinutes);
     await prisma.booking.create({
@@ -87,7 +113,12 @@ async function main() {
     });
   }
 
-  console.log("Turnos de ejemplo creados:", samples.length, `(${service.name} · ${staff.name})`);
+  const byMonth = samples.reduce<Record<string, number>>((acc, row) => {
+    const key = row.ymd.slice(0, 7);
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
+  console.log("Turnos de ejemplo creados:", samples.length, "| por mes:", byMonth);
 
   await prisma.$disconnect();
   await pool.end();
