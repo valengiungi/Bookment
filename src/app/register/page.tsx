@@ -7,6 +7,10 @@ import { MarketingHeader } from "@/components/marketing-header";
 import { useToast } from "@/components/toast";
 
 const STEPS = 4;
+const INVITE_CONTACT_PHONE = "+54 223 5049768";
+const INVITE_CONTACT_WA = INVITE_CONTACT_PHONE.replace(/\D/g, "");
+const INVITE_CONTACT_MESSAGE =
+  "Hola! Estoy interesado en formar parte de Bookment y quisiera solicitar un código de invitación. También me gustaría recibir información sobre planes y precios disponibles. Muchas gracias.";
 
 export default function RegisterPage() {
   const [step, setStep] = useState(0);
@@ -226,6 +230,18 @@ export default function RegisterPage() {
                 <p className="text-sm text-slate-600">
                   Por último, ingresá el <strong>código de invitación</strong> que te compartió quien te
                   dio de alta en Bookment (o el que recibió por correo el administrador).
+                </p>
+                <p className="text-sm leading-relaxed text-slate-600">
+                  Si no tenés código, podés pedirlo al administrador de la aplicación. Contacto:{" "}
+                  <a
+                    href={`https://wa.me/${INVITE_CONTACT_WA}?text=${encodeURIComponent(INVITE_CONTACT_MESSAGE)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold text-teal-700 hover:underline"
+                  >
+                    {INVITE_CONTACT_PHONE}
+                  </a>
+                  .
                 </p>
                 <label className="block text-sm font-medium text-slate-700">
                   Código de invitación
