@@ -2,7 +2,7 @@ import { addMonths } from "date-fns";
 import { formatInTimeZone, toDate } from "date-fns-tz";
 import { auth } from "@/auth";
 import { HistorySummaryTabs } from "@/app/dashboard/history/history-summary-tabs";
-import { HistoryExportButton } from "@/app/dashboard/history/history-export-button";
+import { HistoryExportPanel } from "@/app/dashboard/history/history-export-panel";
 import { canExportData, canViewRevenueInsights } from "@/lib/plan-limits";
 import { prisma } from "@/lib/prisma";
 import { defaultTimeZone } from "@/lib/timezone";
@@ -102,6 +102,9 @@ export default async function HistoryPage({
     ]);
 
   const ars = (cents: number) => `$${(cents / 100).toLocaleString("es-AR")}`;
+  const avgStr = (cents: number, cuts: number) =>
+    insightsLocked || cuts <= 0 ? "—" : ars(Math.round(cents / cuts));
+
   const prevMonth = formatInTimeZone(addMonths(monthStart, -1), tz, "yyyy-MM");
   const nextMonth = formatInTimeZone(addMonths(monthStart, 1), tz, "yyyy-MM");
   const canGoNextMonth = monthStr < currentMonthStr;
@@ -119,18 +122,20 @@ export default async function HistoryPage({
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="space-y-5">
         <h1 className="text-xl font-semibold text-slate-900">Historial</h1>
-        <HistoryExportButton enabled={exportOk} />
+        <HistoryExportPanel enabled={exportOk} />
       </div>
 
       <HistorySummaryTabs
         monthLabel={formatInTimeZone(monthStart, tz, "MMMM yyyy")}
         monthCuts={monthCuts}
-        monthRevenue={ars(monthRevenueCents)}
+        monthRevenue={insightsLocked ? "—" : ars(monthRevenueCents)}
+        monthAvgRevenue={avgStr(monthRevenueCents, monthCuts)}
         monthTop={monthTopUi}
         totalCuts={totalCuts}
-        totalRevenue={ars(totalRevenueCents)}
+        totalRevenue={insightsLocked ? "—" : ars(totalRevenueCents)}
+        totalAvgRevenue={avgStr(totalRevenueCents, totalCuts)}
         totalTop={totalTopUi}
         prevMonthHref={`/dashboard/history?month=${prevMonth}`}
         nextMonthHref={`/dashboard/history?month=${nextMonth}`}

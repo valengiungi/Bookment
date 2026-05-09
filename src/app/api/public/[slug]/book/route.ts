@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isReservedSlug } from "@/lib/reserved-slugs";
 import { createBooking } from "@/modules/booking/create-booking";
@@ -20,6 +21,14 @@ export async function POST(
   const { slug } = await ctx.params;
   if (isReservedSlug(slug)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const session = await auth();
+  if (session?.user?.role === "SUPER_ADMIN") {
+    return NextResponse.json(
+      { error: "Los super admin no reservan desde la página pública. Usá la ficha en Admin." },
+      { status: 403 },
+    );
   }
 
   let json: unknown;

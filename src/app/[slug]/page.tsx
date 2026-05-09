@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isReservedSlug } from "@/lib/reserved-slugs";
 import { planDefinitionForTenant } from "@/lib/plans";
@@ -23,6 +24,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function PublicTenantPage({ params }: Props) {
   const { slug } = await params;
   if (isReservedSlug(slug)) notFound();
+
+  const session = await auth();
+  if (session?.user?.role === "SUPER_ADMIN") {
+    const adminRow = await prisma.tenant.findFirst({
+      where: { slug },
+      select: { id: true },
+    });
+    if (adminRow) redirect(`/admin/tenants/${adminRow.id}`);
+    redirect(`/admin/tenants?q=${encodeURIComponent(slug)}`);
+  }
 
   const tenant = await prisma.tenant.findFirst({
     where: { slug, active: true },

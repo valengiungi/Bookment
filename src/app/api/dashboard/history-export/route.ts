@@ -12,6 +12,13 @@ function csvEscape(s: string): string {
   return s;
 }
 
+function formatArsFromCents(cents: number): string {
+  return (cents / 100).toLocaleString("es-AR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+}
+
 export async function GET() {
   const session = await auth();
   const tenantId = session?.user?.tenantId;
@@ -39,29 +46,53 @@ export async function GET() {
       customerName: true,
       customerPhone: true,
       customerEmail: true,
-      service: { select: { name: true } },
+      service: { select: { name: true, priceCents: true } },
       staff: { select: { name: true } },
     },
   });
 
   const tz = defaultTimeZone;
-  const rows = [
-    ["Inicio (local)", "Servicio", "Profesional", "Cliente", "Teléfono", "Email"].join(","),
-    ...bookings.map((b) =>
-      [
-        formatInTimeZone(b.startsAt, tz, "yyyy-MM-dd HH:mm"),
-        b.service.name,
-        b.staff.name,
-        b.customerName,
-        b.customerPhone,
-        b.customerEmail ?? "",
-      ]
-        .map((c) => csvEscape(String(c)))
-        .join(","),
-    ),
+  const header = [
+    "Inicio (hora local)",
+    "Servicio",
+    "Profesional",
+    "Cliente",
+    "Teléfono",
+    "Email",
+    "Precio servicio (ARS)",
+    "Importe línea (ARS)",
   ];
 
-  const body = rows.join("\n");
+  let totalCents = 0;
+  const dataLines = bookings.map((b) => {
+    const lineCents = b.service.priceCents ?? 0;
+    totalCents += lineCents;
+    return [
+      formatInTimeZone(b.startsAt, tz, "yyyy-MM-dd HH:mm"),
+      b.service.name,
+      b.staff.name,
+      b.customerName,
+      b.customerPhone,
+      b.customerEmail ?? "",
+      formatArsFromCents(lineCents),
+      formatArsFromCents(lineCents),
+    ]
+      .map((c) => csvEscape(String(c)))
+      .join(",");
+  });
+
+  const n = bookings.length;
+  const avgCents = n > 0 ? Math.round(totalCents / n) : 0;
+
+  const summaryLines = [
+    "",
+    ["Resumen", "", "", "", "", "", "Turnos exportados", String(n)].join(","),
+    ["", "", "", "", "", "", "Total estimado (ARS)", formatArsFromCents(totalCents)].join(","),
+    ["", "", "", "", "", "", "Promedio por turno (ARS)", formatArsFromCents(avgCents)].join(","),
+  ];
+
+  const rows = [header.join(","), ...dataLines, ...summaryLines];
+  const body = `\uFEFF${rows.join("\n")}`;
   const filename = `bookment-${tenant.slug}-reservas.csv`;
 
   return new NextResponse(body, {

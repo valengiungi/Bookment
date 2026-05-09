@@ -42,6 +42,8 @@ export async function setTenantPlanAction(tenantId: string, subscriptionTier: st
   revalidatePath("/admin");
   revalidatePath("/admin/tenants");
   revalidatePath(`/admin/tenants/${tenantId}`);
+  /** El negocio debe ver límites, historial y export al instante */
+  revalidatePath("/dashboard", "layout");
   return { ok: true as const };
 }
 
