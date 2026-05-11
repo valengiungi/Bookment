@@ -1,16 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { type ReactNode, useRef } from "react";
-import {
-  LazyMotion,
-  domAnimation,
-  m,
-  useReducedMotion,
-  useScroll,
-  useSpring,
-  useTransform,
-} from "framer-motion";
+import { type ReactNode } from "react";
+import { LazyMotion, domAnimation, m, useReducedMotion } from "framer-motion";
 
 /** Antes / ahora: tono profesional; detalle de Excel y avisos alineado al producto. */
 const frictionRows: [string, string][] = [
@@ -46,13 +38,14 @@ function RevealSection({
   children: ReactNode;
 }) {
   const reduce = useReducedMotion();
+  /** Solo opacidad: el translateY en bloques grandes suele sentirse como “traba” al scrollear. */
   return (
     <m.section
       className={className}
-      initial={{ opacity: reduce ? 1 : 0, y: reduce ? 0 : 28 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-72px", amount: 0.18 }}
-      transition={{ duration: reduce ? 0 : 0.58, ease: easeOut }}
+      initial={{ opacity: reduce ? 1 : 0 }}
+      whileInView={{ opacity: 1 }}
+      viewport={{ once: true, margin: "0px 0px -80px 0px", amount: 0.05 }}
+      transition={{ duration: reduce ? 0 : 0.38, ease: easeOut }}
     >
       {children}
     </m.section>
@@ -67,20 +60,6 @@ export function MarketingHomeContent({
   pricingPremium: ReactNode;
 }) {
   const reduce = useReducedMotion();
-  const heroRef = useRef<HTMLElement | null>(null);
-  const { scrollYProgress } = useScroll({
-    target: heroRef,
-    offset: ["start start", "end start"],
-  });
-  /** Parallax más fluido: el progreso de scroll se “suaviza” antes de mapear a translate. */
-  const smoothHeroProgress = useSpring(scrollYProgress, {
-    stiffness: reduce ? 1200 : 42,
-    damping: reduce ? 120 : 19,
-    mass: reduce ? 0.08 : 0.72,
-    restDelta: 0.0008,
-  });
-  const blobSlow = useTransform(smoothHeroProgress, [0, 1], reduce ? [0, 0] : [0, 36]);
-  const blobFast = useTransform(smoothHeroProgress, [0, 1], reduce ? [0, 0] : [0, -18]);
 
   const heroContainer = {
     hidden: {},
@@ -95,11 +74,11 @@ export function MarketingHomeContent({
   };
 
   const heroItem = {
-    hidden: { opacity: reduce ? 1 : 0, y: reduce ? 0 : 22 },
+    hidden: { opacity: reduce ? 1 : 0, y: reduce ? 0 : 12 },
     show: {
       opacity: 1,
       y: 0,
-      transition: { duration: reduce ? 0 : 0.52, ease: easeOut },
+      transition: { duration: reduce ? 0 : 0.45, ease: easeOut },
     },
   };
 
@@ -111,11 +90,11 @@ export function MarketingHomeContent({
   };
 
   const staggerCard = {
-    hidden: { opacity: reduce ? 1 : 0, y: reduce ? 0 : 18 },
+    hidden: { opacity: reduce ? 1 : 0, y: reduce ? 0 : 10 },
     show: {
       opacity: 1,
       y: 0,
-      transition: { duration: reduce ? 0 : 0.48, ease: easeOut },
+      transition: { duration: reduce ? 0 : 0.4, ease: easeOut },
     },
   };
 
@@ -127,36 +106,31 @@ export function MarketingHomeContent({
   };
 
   const faqItem = {
-    hidden: { opacity: reduce ? 1 : 0, y: reduce ? 0 : 14 },
+    hidden: { opacity: reduce ? 1 : 0, y: reduce ? 0 : 8 },
     show: {
       opacity: 1,
       y: 0,
-      transition: { duration: reduce ? 0 : 0.45, ease: easeOut },
+      transition: { duration: reduce ? 0 : 0.36, ease: easeOut },
     },
   };
 
   return (
     <LazyMotion features={domAnimation} strict>
       <>
-        <main className="flex-1 overflow-x-hidden">
-          <m.section
-            ref={heroRef}
-            className="relative mx-auto max-w-6xl px-4 pt-12 pb-5 sm:px-6 sm:pt-16 sm:pb-6"
-          >
-            <m.div
+        <main className="flex-1 overflow-x-clip">
+          <m.section className="relative mx-auto max-w-6xl px-4 pt-12 pb-5 sm:px-6 sm:pt-16 sm:pb-6">
+            <div
               aria-hidden
               className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
-              style={{ y: blobSlow }}
             >
               <div className="absolute -left-24 top-1/4 h-72 w-72 rounded-full bg-teal-100/40 blur-3xl" />
-            </m.div>
-            <m.div
+            </div>
+            <div
               aria-hidden
               className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
-              style={{ y: blobFast }}
             >
               <div className="absolute -right-20 top-0 h-64 w-64 rounded-full bg-slate-200/50 blur-3xl" />
-            </m.div>
+            </div>
 
             <div className="mx-auto max-w-2xl text-center">
               <m.div
@@ -219,7 +193,7 @@ export function MarketingHomeContent({
                 Cómo era antes y cómo es ahora
               </h2>
               <div className="mx-auto mt-8 max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto [-webkit-overflow-scrolling:touch] [overscroll-behavior-x:contain]">
                   <table className="w-full min-w-[32rem] text-left text-sm">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50">
@@ -266,7 +240,7 @@ export function MarketingHomeContent({
                 variants={staggerWrap}
                 initial="hidden"
                 whileInView="show"
-                viewport={{ once: true, margin: "-48px", amount: 0.2 }}
+                viewport={{ once: true, margin: "0px 0px -72px 0px", amount: 0.08 }}
               >
                 {[
                   ["1", "Creá tu cuenta", "Registro simple en minutos."],
@@ -296,7 +270,7 @@ export function MarketingHomeContent({
               variants={staggerWrap}
               initial="hidden"
               whileInView="show"
-              viewport={{ once: true, margin: "-48px", amount: 0.2 }}
+              viewport={{ once: true, margin: "0px 0px -72px 0px", amount: 0.08 }}
             >
               <m.h2
                 variants={staggerCard}
@@ -332,7 +306,7 @@ export function MarketingHomeContent({
                 variants={faqStagger}
                 initial="hidden"
                 whileInView="show"
-                viewport={{ once: true, margin: "-40px", amount: 0.15 }}
+                viewport={{ once: true, margin: "0px 0px -72px 0px", amount: 0.08 }}
               >
                 {[
                   [
@@ -368,10 +342,10 @@ export function MarketingHomeContent({
           <RevealSection className="py-16 sm:py-20">
             <m.div
               className="mx-auto max-w-3xl rounded-3xl bg-teal-700 px-6 py-12 text-center text-white sm:px-10"
-              initial={{ opacity: reduce ? 1 : 0, y: reduce ? 0 : 24, scale: reduce ? 1 : 0.985 }}
-              whileInView={{ opacity: 1, y: 0, scale: 1 }}
-              viewport={{ once: true, margin: "-64px", amount: 0.25 }}
-              transition={{ duration: reduce ? 0 : 0.6, ease: easeOut }}
+              initial={{ opacity: reduce ? 1 : 0, y: reduce ? 0 : 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "0px 0px -80px 0px", amount: 0.1 }}
+              transition={{ duration: reduce ? 0 : 0.42, ease: easeOut }}
             >
               <h2 className="text-2xl font-semibold sm:text-3xl">Listo para ordenar tu agenda</h2>
               <p className="mt-3 text-teal-100">
@@ -396,10 +370,10 @@ export function MarketingHomeContent({
 
         <m.footer
           className="border-t border-slate-200 py-8 text-center text-sm text-slate-500"
-          initial={{ opacity: reduce ? 1 : 0, y: reduce ? 0 : 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-20px", amount: 0.4 }}
-          transition={{ duration: reduce ? 0 : 0.45, ease: easeOut }}
+          initial={{ opacity: reduce ? 1 : 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true, margin: "0px 0px -48px 0px", amount: 0.2 }}
+          transition={{ duration: reduce ? 0 : 0.35, ease: easeOut }}
         >
           © {new Date().getFullYear()} Bookment
         </m.footer>

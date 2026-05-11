@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 52" fill="none" role="img" aria-label="Bookment">
+  <title>Bookment</title>
+  <!-- Isotipo -->
+  <rect x="0" y="2" width="48" height="48" rx="11" fill="#0d9488"/>
+  <rect x="12" y="14" width="24" height="22" rx="2.5" stroke="#ffffff" stroke-width="1.75"/>
+  <path d="M12 20h24" stroke="#ffffff" stroke-width="1.75" stroke-linecap="round"/>
+  <circle cx="16.5" cy="16.5" r="1.5" fill="#ffffff"/>
+  <circle cx="31.5" cy="16.5" r="1.5" fill="#ffffff"/>
+  <path
+    d="M16 32.5l5 5 11-11"
+    stroke="#ffffff"
+    stroke-width="2.25"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <!-- Wordmark: tono sobrio, legible en impresos y web -->
+  <text
+    x="60"
+    y="36.5"
+    font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+    font-size="28"
+    font-weight="650"
+    letter-spacing="-0.045em"
+    fill="#0f172a"
+  >
+    <tspan fill="#0d9488">Book</tspan><tspan fill="#0f172a">ment</tspan>
+  </text>
+</svg>
