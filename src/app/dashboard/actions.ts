@@ -1,13 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { formatInTimeZone } from "date-fns-tz";
 import { redirect, RedirectType } from "next/navigation";
 import { compare, hash } from "bcryptjs";
 import { z } from "zod";
 import { auth, signOut } from "@/auth";
 import { BlockReason, BookingStatus } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma";
+import { getEffectivePlanId } from "@/lib/plans";
 import { canCreateService, canCreateStaff } from "@/lib/plan-limits";
+import { updateBooking as updateBookingCore } from "@/modules/booking/update-booking";
 import { parseDatetimeLocalToUtc } from "@/lib/datetime-local";
 import { defaultTimeZone } from "@/lib/timezone";
 import {
@@ -39,6 +42,67 @@ export async function cancelBooking(bookingId: string) {
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/history");
+}
+
+export async function updateBookingFromDashboard(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { ok: false as const, message: "No autorizado" };
+  }
+  const tenantId = session.user.tenantId;
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { subscriptionTier: true },
+  });
+  if (getEffectivePlanId(tenant?.subscriptionTier ?? "simple") !== "premium") {
+    return { ok: false as const, message: "Disponible en plan Premium." };
+  }
+
+  const bookingId = String(formData.get("bookingId") ?? "").trim();
+  const serviceId = String(formData.get("serviceId") ?? "").trim();
+  const staffId = String(formData.get("staffId") ?? "").trim();
+  const startsLocal = String(formData.get("startsAt") ?? "").trim();
+  if (!bookingId || !serviceId || !staffId || !startsLocal) {
+    return { ok: false as const, message: "Completá todos los campos." };
+  }
+  const tz = defaultTimeZone;
+  const startsAt = parseDatetimeLocalToUtc(startsLocal, tz);
+  if (!startsAt) {
+    return { ok: false as const, message: "Fecha u hora inválida." };
+  }
+
+  const result = await updateBookingCore({
+    bookingId,
+    tenantId,
+    serviceId,
+    staffId,
+    startsAt,
+    timeZone: tz,
+  });
+
+  if (!result.ok) {
+    const map: Record<string, string> = {
+      BOOKING_NOT_FOUND: "No encontramos ese turno.",
+      SERVICE_NOT_FOUND: "Servicio no disponible.",
+      STAFF_NOT_FOUND: "Profesional no disponible.",
+      SERVICE_STAFF_MISMATCH: "Ese profesional no ofrece el servicio elegido.",
+      CLOSED_DAY: "Ese día está cerrado en el horario configurado.",
+      OUTSIDE_HOURS: "La hora queda fuera del horario de trabajo.",
+      DOUBLE_BOOK: "Ya hay otro turno en ese horario.",
+      BLOCKED: "Ese horario está bloqueado.",
+    };
+    return { ok: false as const, message: map[result.code] ?? "No se pudo guardar." };
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/history");
+  revalidatePath(`/dashboard/bookings/${bookingId}/edit`);
+  const ymd = formatInTimeZone(startsAt, tz, "yyyy-MM-dd");
+  const monthKey = ymd.slice(0, 7);
+  return {
+    ok: true as const,
+    redirectTo: `/dashboard?month=${monthKey}&date=${ymd}`,
+  };
 }
 
 export async function createBlock(formData: FormData) {

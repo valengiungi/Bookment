@@ -3,8 +3,10 @@
 import { formatInTimeZone } from "date-fns-tz";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatCalendarDayHeading } from "@/lib/calendar-display";
+import { BookingReminderButton } from "./booking-reminder-button";
 import { CancelBookingButton } from "./cancel-booking-button";
 import { DashboardHomeCalendar } from "./dashboard-home-calendar";
+import { EditBookingDashboardButton } from "./edit-booking-dashboard-button";
 
 export type InicioLiveBooking = {
   id: string;
@@ -42,6 +44,8 @@ export function DashboardHomeLive({
   initialUpcoming,
   initialStaffCount,
   initialServiceCount,
+  isPremium,
+  businessName,
 }: {
   timeZone: string;
   monthKey: string;
@@ -51,6 +55,8 @@ export function DashboardHomeLive({
   prevHref: string;
   nextHref: string;
   monthTitle: string;
+  isPremium: boolean;
+  businessName: string;
   initialCounts: Record<string, number>;
   initialDayBookings: InicioLiveBooking[];
   initialTodayCount: number;
@@ -172,7 +178,20 @@ export function DashboardHomeLive({
                       </p>
                       <p className="text-sm text-slate-500">{b.customerPhone}</p>
                     </div>
-                    <CancelBookingButton bookingId={b.id} />
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <BookingReminderButton
+                        isPremium={isPremium}
+                        timeZone={timeZone}
+                        customerPhone={b.customerPhone}
+                        customerName={b.customerName}
+                        startsAtIso={b.startsAt}
+                        serviceName={b.service.name}
+                        staffName={b.staff.name}
+                        businessName={businessName}
+                      />
+                      <EditBookingDashboardButton isPremium={isPremium} bookingId={b.id} />
+                      <CancelBookingButton bookingId={b.id} />
+                    </div>
                   </li>
                 ))}
               </ul>

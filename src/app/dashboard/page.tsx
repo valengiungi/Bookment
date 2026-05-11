@@ -1,9 +1,11 @@
 import { addDays, addMonths } from "date-fns";
 import { formatInTimeZone, toDate } from "date-fns-tz";
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";import { withDbRetry } from "@/lib/db-retry";
+import { auth } from "@/auth";
+import { withDbRetry } from "@/lib/db-retry";
 import { prisma } from "@/lib/prisma";
 import { formatCalendarMonthTitle } from "@/lib/calendar-display";
+import { getEffectivePlanId } from "@/lib/plans";
 import { defaultTimeZone } from "@/lib/timezone";
 import { DashboardHomeLive } from "./dashboard-home-live";
 
@@ -64,6 +66,7 @@ export default async function DashboardHomePage({
   const todayWindowEnd = addDays(todayWindowStart, 1);
 
   const [
+    tenantRow,
     todayCount,
     upcoming,
     staffCount,
@@ -72,6 +75,10 @@ export default async function DashboardHomePage({
     dayBookings,
   ] = await withDbRetry(() =>
     Promise.all([
+      prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { subscriptionTier: true, name: true },
+      }),
       prisma.booking.count({
         where: {
           tenantId,
@@ -107,6 +114,9 @@ export default async function DashboardHomePage({
       }),
     ]),
   );
+  const isPremium = getEffectivePlanId(tenantRow?.subscriptionTier ?? "simple") === "premium";
+  const businessName = tenantRow?.name ?? "";
+
   const counts: Record<string, number> = {};
   for (const b of monthBookingRows) {
     const k = formatInTimeZone(b.startsAt, tz, "yyyy-MM-dd");
@@ -145,6 +155,8 @@ export default async function DashboardHomePage({
         prevHref={prevHref}
         nextHref={nextHref}
         monthTitle={monthTitle}
+        isPremium={isPremium}
+        businessName={businessName}
         initialCounts={counts}
         initialDayBookings={initialDayBookings}
         initialTodayCount={todayCount}
