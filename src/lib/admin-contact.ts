@@ -15,8 +15,17 @@ export function bookmentAdminWhatsAppDigits(): string {
 export const BOOKMENT_PREMIUM_UPGRADE_PREFILL =
   "Hola, soy usuario/a de Bookment con el plan Simple. Quiero pasar al plan Premium para poder contactar a mis clientes por WPP desde el panel. ¿Me podrían indicar los pasos y las condiciones? Quedo atento/a. Muchas gracias.";
 
+export const BOOKMENT_BLOCKED_ACCOUNT_PREFILL =
+  "Hola, tengo mi cuenta de Bookment bloqueada y no puedo usar el panel. ¿Me podrían indicar cómo regularizarla? Muchas gracias.";
+
 export function bookmentAdminPremiumUpgradeHref(): string {
   const n = bookmentAdminWhatsAppDigits();
   if (!n) return "#";
   return `https://wa.me/${n}?text=${encodeURIComponent(BOOKMENT_PREMIUM_UPGRADE_PREFILL)}`;
+}
+
+export function bookmentAdminBlockedAccountHref(): string {
+  const n = bookmentAdminWhatsAppDigits();
+  if (!n) return "#";
+  return `https://wa.me/${n}?text=${encodeURIComponent(BOOKMENT_BLOCKED_ACCOUNT_PREFILL)}`;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { LazyMotion, domAnimation, m, useReducedMotion } from "framer-motion";
 
 /** Antes / ahora: tono profesional; detalle de Excel y avisos alineado al producto. */
@@ -30,6 +30,95 @@ const frictionRows: [string, string][] = [
 
 const easeOut: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
+type BillingCycle = "monthly" | "annual";
+
+type PricingData = {
+  simpleMonthlyArs: number;
+  premiumMonthlyArs: number;
+  simpleAnnualArs: number;
+  premiumAnnualArs: number;
+};
+
+function formatArs(amount: number): string {
+  return `$${Math.round(amount).toLocaleString("es-AR")}`;
+}
+
+function formatPercentOff(monthlyArs: number, annualArs: number): string | null {
+  const baseAnnual = monthlyArs * 12;
+  if (baseAnnual <= annualArs) return null;
+  const pct = Math.round(((baseAnnual - annualArs) / baseAnnual) * 100);
+  return `${pct}% off`;
+}
+
+function PricingCard({
+  name,
+  description,
+  featured = false,
+  billingCycle,
+  monthlyArs,
+  annualArs,
+  items,
+}: {
+  name: string;
+  description: string;
+  featured?: boolean;
+  billingCycle: BillingCycle;
+  monthlyArs: number;
+  annualArs: number;
+  items: string[];
+}) {
+  const isAnnual = billingCycle === "annual";
+  const priceArs = isAnnual ? annualArs : monthlyArs;
+  const yearlySaving = monthlyArs * 12 - annualArs;
+  const percentOff = formatPercentOff(monthlyArs, annualArs);
+
+  return (
+    <div
+      className={
+        featured
+          ? "rounded-2xl border-2 border-teal-200 bg-teal-50/50 p-6 shadow-sm"
+          : "rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+      }
+    >
+      {featured ? (
+        <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">Más vendido</p>
+      ) : null}
+      <h3 className={featured ? "mt-1 text-lg font-semibold text-slate-900" : "text-lg font-semibold text-slate-900"}>
+        {name}
+      </h3>
+      <p className="mt-1 text-sm text-slate-600">{description}</p>
+      <p className="mt-3 text-3xl font-bold text-slate-900">
+        {formatArs(priceArs)}{" "}
+        <span className="text-base font-normal text-slate-500">
+          / {isAnnual ? "año" : "mes"}
+        </span>
+      </p>
+      {isAnnual ? (
+        <div className="mt-2 space-y-1">
+          <p className="text-sm font-medium text-slate-700">
+            Equivale a {formatArs(priceArs / 12)} por mes.
+          </p>
+          {yearlySaving > 0 ? (
+            <p className="text-sm text-teal-700">
+              Ahorrás {formatArs(yearlySaving)} al pagar anual
+              {percentOff ? ` (${percentOff})` : ""}.
+            </p>
+          ) : (
+            <p className="text-sm text-slate-500">Pago anticipado anual.</p>
+          )}
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-slate-500">Facturación mensual.</p>
+      )}
+      <ul className="mt-4 space-y-2 text-sm text-slate-600">
+        {items.map((item) => (
+          <li key={item}>• {item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function RevealSection({
   className,
   children,
@@ -53,13 +142,12 @@ function RevealSection({
 }
 
 export function MarketingHomeContent({
-  pricingSimple,
-  pricingPremium,
+  pricing,
 }: {
-  pricingSimple: ReactNode;
-  pricingPremium: ReactNode;
+  pricing: PricingData;
 }) {
   const reduce = useReducedMotion();
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
 
   const heroContainer = {
     hidden: {},
@@ -285,12 +373,68 @@ export function MarketingHomeContent({
                 Dos planes claros. Los montos se pueden ajustar según tu mercado; al registrarte te
                 asignan el plan que acuerdes con quien opera Bookment.
               </m.p>
+              <m.div variants={staggerCard} className="mx-auto mt-8 max-w-4xl">
+                <div className="rounded-[1.4rem] border-[3px] border-slate-800 bg-slate-800 p-1.5 shadow-sm">
+                  <div className="grid grid-cols-2 gap-1">
+                    {([
+                      ["monthly", "Mensual"],
+                      ["annual", "Anual"],
+                    ] as const).map(([value, label]) => {
+                      const active = billingCycle === value;
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => setBillingCycle(value)}
+                          className={
+                            active
+                              ? "rounded-[1.1rem] bg-white px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm"
+                              : "rounded-[1.1rem] px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-slate-700/60"
+                          }
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <p className="mt-3 text-center text-sm text-slate-500">
+                  Anual: pago anticipado con mejor precio.
+                </p>
+              </m.div>
               <div className="mx-auto mt-8 grid max-w-3xl gap-6 md:grid-cols-2">
                 <m.div variants={staggerCard} className="min-w-0">
-                  {pricingSimple}
+                  <PricingCard
+                    name="Simple"
+                    description="Para negocios que arrancan o con agenda acotada."
+                    billingCycle={billingCycle}
+                    monthlyArs={pricing.simpleMonthlyArs}
+                    annualArs={pricing.simpleAnnualArs}
+                    items={[
+                      "Link público y reservas sin choques de horario",
+                      "Cupo limitado: hasta 3 servicios y 2 profesionales",
+                      "Límite mensual de turnos confirmados",
+                      "Panel para agenda, bloqueos y clientes",
+                      "Sin aviso por WhatsApp al negocio: el turno queda en la agenda y lo ves al entrar",
+                    ]}
+                  />
                 </m.div>
                 <m.div variants={staggerCard} className="min-w-0">
-                  {pricingPremium}
+                  <PricingCard
+                    name="Premium"
+                    description="Cuando la agenda crece y necesitás datos."
+                    featured
+                    billingCycle={billingCycle}
+                    monthlyArs={pricing.premiumMonthlyArs}
+                    annualArs={pricing.premiumAnnualArs}
+                    items={[
+                      "Sin tope de turnos, servicios ni tamaño de equipo",
+                      "Métricas de plata estimada y ranking de clientes en tu historial",
+                      "Descargá tus reservas en un archivo para Excel o planillas (turnos confirmados)",
+                      "Aviso por WhatsApp al negocio cuando alguien reserva por el link público",
+                    ]}
+                  />
                 </m.div>
               </div>
             </m.div>
