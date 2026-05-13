@@ -1,8 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getConfiguredListPrices } from "@/lib/platform-pricing";
 import { formatLimit, planDefinitionForTenant, planLabel } from "@/lib/plans";
+import {
+  billingCycleLabel,
+  formatAdminDate,
+} from "../billing-utils";
 import { TenantActiveToggle } from "../tenant-active-toggle";
+import { TenantBillingForm } from "../tenant-billing-form";
+import { TenantBillingStatusBadge } from "../tenant-billing-status-badge";
 import { TenantNotesForm } from "../tenant-notes-form";
 import { TenantPlanForm } from "../tenant-plan-form";
 
@@ -34,6 +41,19 @@ export default async function AdminTenantDetailPage({
         select: { id: true, email: true, name: true, role: true },
         orderBy: { createdAt: "asc" },
       },
+      billingPayments: {
+        orderBy: [{ paidAt: "desc" }, { createdAt: "desc" }],
+        take: 20,
+        select: {
+          id: true,
+          planId: true,
+          billingCycle: true,
+          amountArs: true,
+          paidAt: true,
+          nextDueAt: true,
+          note: true,
+        },
+      },
       _count: {
         select: {
           bookings: true,
@@ -60,6 +80,8 @@ export default async function AdminTenantDetailPage({
   ]);
 
   const planDef = planDefinitionForTenant(tenant.subscriptionTier);
+  const latestBillingPayment = tenant.billingPayments[0] ?? null;
+  const { simple, premium } = await getConfiguredListPrices();
 
   return (
     <div className="space-y-8">
@@ -140,6 +162,132 @@ export default async function AdminTenantDetailPage({
           </Link>
           .
         </p>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-lg font-semibold text-slate-900">Cobros y vencimiento</h2>
+          <p className="text-sm text-slate-600">
+            Registrá cada pago para ver plan cobrado, importe, modalidad y próximo vencimiento.
+          </p>
+        </div>
+
+        <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_360px]">
+          <div className="space-y-5">
+            {latestBillingPayment ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Último pago
+                  </p>
+                  <p className="mt-2 text-lg font-semibold text-slate-900">
+                    {formatAdminDate(latestBillingPayment.paidAt)}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Plan cobrado
+                  </p>
+                  <p className="mt-2 text-lg font-semibold text-slate-900">
+                    {planLabel(latestBillingPayment.planId)}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Importe
+                  </p>
+                  <p className="mt-2 text-lg font-semibold text-slate-900">
+                    ${latestBillingPayment.amountArs.toLocaleString("es-AR")}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Próximo vencimiento
+                  </p>
+                  <p className="mt-2 text-lg font-semibold text-slate-900">
+                    {formatAdminDate(latestBillingPayment.nextDueAt)}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {billingCycleLabel(latestBillingPayment.billingCycle)}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Estado
+                  </p>
+                  <div className="mt-2">
+                    <TenantBillingStatusBadge nextDueAt={latestBillingPayment.nextDueAt} />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-6 text-sm text-slate-500">
+                Todavía no hay pagos registrados para este negocio.
+              </div>
+            )}
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="min-w-full text-left text-sm">
+                <thead className="border-b border-slate-100 bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">Fecha pago</th>
+                    <th className="px-4 py-2 font-medium">Plan</th>
+                    <th className="px-4 py-2 font-medium">Modalidad</th>
+                    <th className="px-4 py-2 font-medium">Importe</th>
+                    <th className="px-4 py-2 font-medium">Próximo venc.</th>
+                    <th className="px-4 py-2 font-medium">Estado</th>
+                    <th className="px-4 py-2 font-medium">Nota</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tenant.billingPayments.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                        No hay pagos cargados.
+                      </td>
+                    </tr>
+                  ) : (
+                    tenant.billingPayments.map((payment) => (
+                      <tr key={payment.id} className="border-b border-slate-50 align-top">
+                        <td className="px-4 py-3 text-slate-700">{formatAdminDate(payment.paidAt)}</td>
+                        <td className="px-4 py-3 text-slate-700">{planLabel(payment.planId)}</td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {billingCycleLabel(payment.billingCycle)}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          ${payment.amountArs.toLocaleString("es-AR")}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {formatAdminDate(payment.nextDueAt)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <TenantBillingStatusBadge nextDueAt={payment.nextDueAt} />
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">
+                          {payment.note?.trim() ? payment.note : "—"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
+            <h3 className="text-base font-semibold text-slate-900">Registrar pago</h3>
+            <p className="mt-1 text-sm text-slate-600">
+              El próximo vencimiento se calcula automáticamente desde la fecha de pago.
+            </p>
+            <div className="mt-4">
+              <TenantBillingForm
+                tenantId={tenant.id}
+                currentTier={tenant.subscriptionTier}
+                suggestedMonthlyAmounts={{ simple, premium }}
+              />
+            </div>
+          </div>
+        </div>
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

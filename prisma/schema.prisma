@@ -26,6 +26,11 @@ enum BlockReason {
   HOLIDAY
 }
 
+enum TenantBillingCycle {
+  MONTHLY
+  ANNUAL
+}
+
 model User {
   id             String    @id @default(cuid())
   email          String    @unique
@@ -125,6 +130,7 @@ model Tenant {
   workingHours     WorkingHour[]
   blockedSlots     BlockedSlot[]
   bookings         Booking[]
+  billingPayments  TenantBillingPayment[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -244,4 +250,20 @@ model ReminderJob {
   createdAt DateTime  @default(now())
 
   @@index([fireAt, sentAt])
+}
+
+model TenantBillingPayment {
+  id           String             @id @default(cuid())
+  tenantId     String
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planId       String
+  billingCycle TenantBillingCycle
+  amountArs    Int
+  paidAt       DateTime
+  nextDueAt    DateTime
+  note         String?
+  createdAt    DateTime           @default(now())
+
+  @@index([tenantId, paidAt])
+  @@index([tenantId, nextDueAt])
 }

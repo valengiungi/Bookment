@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { planLabel } from "@/lib/plans";
+import { formatAdminDate } from "./billing-utils";
+import { TenantBillingStatusBadge } from "./tenant-billing-status-badge";
 import { TenantSearchForm } from "./tenant-search-form";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +24,7 @@ export default async function AdminTenantsPage({
     onboardingDone: boolean;
     createdAt: Date;
     _count: { bookings: number; users: number };
+    billingPayments: { id: string; paidAt: Date; nextDueAt: Date }[];
   }[] = [];
 
   if (q.length >= 2) {
@@ -44,6 +47,11 @@ export default async function AdminTenantsPage({
         onboardingDone: true,
         createdAt: true,
         _count: { select: { bookings: true, users: true } },
+        billingPayments: {
+          orderBy: [{ paidAt: "desc" }, { createdAt: "desc" }],
+          take: 1,
+          select: { id: true, paidAt: true, nextDueAt: true },
+        },
       },
     });
   } else if (q.length === 1) {
@@ -61,6 +69,11 @@ export default async function AdminTenantsPage({
         onboardingDone: true,
         createdAt: true,
         _count: { select: { bookings: true, users: true } },
+        billingPayments: {
+          orderBy: [{ paidAt: "desc" }, { createdAt: "desc" }],
+          take: 1,
+          select: { id: true, paidAt: true, nextDueAt: true },
+        },
       },
     });
   }
@@ -95,19 +108,26 @@ export default async function AdminTenantsPage({
               <th className="px-4 py-2 font-medium">Estado</th>
               <th className="px-4 py-2 font-medium">Onboarding</th>
               <th className="px-4 py-2 font-medium">Reservas</th>
+              <th className="px-4 py-2 font-medium">Último pago</th>
+              <th className="px-4 py-2 font-medium">Próximo venc.</th>
+              <th className="px-4 py-2 font-medium">Estado cobro</th>
               <th className="px-4 py-2 font-medium w-28" />
             </tr>
           </thead>
           <tbody>
             {tenants.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={10} className="px-4 py-8 text-center text-slate-500">
                   {q.length >= 2 ? "No hay resultados." : "No hay negocios cargados."}
                 </td>
               </tr>
             ) : (
               tenants.map((t) => (
                 <tr key={t.id} className="border-b border-slate-50">
+                  {(() => {
+                    const latestPayment = t.billingPayments[0] ?? null;
+                    return (
+                      <>
                   <td className="px-4 py-2 font-medium text-slate-900">{t.name}</td>
                   <td className="px-4 py-2 text-slate-600">{t.slug}</td>
                   <td className="px-4 py-2 text-slate-600">{planLabel(t.subscriptionTier)}</td>
@@ -122,6 +142,19 @@ export default async function AdminTenantsPage({
                     {t.onboardingDone ? "Sí" : "No"}
                   </td>
                   <td className="px-4 py-2 text-slate-600">{t._count.bookings}</td>
+                  <td className="px-4 py-2 text-slate-600">
+                    {latestPayment ? formatAdminDate(latestPayment.paidAt) : "—"}
+                  </td>
+                  <td className="px-4 py-2 text-slate-600">
+                    {latestPayment ? formatAdminDate(latestPayment.nextDueAt) : "—"}
+                  </td>
+                  <td className="px-4 py-2">
+                    {latestPayment ? (
+                      <TenantBillingStatusBadge nextDueAt={latestPayment.nextDueAt} />
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-2 text-right">
                     <Link
                       href={`/admin/tenants/${t.id}`}
@@ -130,6 +163,9 @@ export default async function AdminTenantsPage({
                       Ver ficha
                     </Link>
                   </td>
+                      </>
+                    );
+                  })()}
                 </tr>
               ))
             )}
