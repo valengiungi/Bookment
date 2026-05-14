@@ -37,21 +37,6 @@ enum TenantExpenseKind {
   DYNAMIC
 }
 
-enum WhatsAppChatbotMode {
-  DISABLED
-  READ_ONLY
-}
-
-enum WhatsAppChatOutcome {
-  ANSWERED
-  ACTION_BLOCKED
-  NO_LINK
-  NO_PERMISSION
-  DISABLED
-  UNKNOWN
-  ERROR
-}
-
 model User {
   id                 String                   @id @default(cuid())
   email              String                   @unique
@@ -59,13 +44,10 @@ model User {
   passwordHash       String
   name               String?
   image              String?
-  whatsappNumber     String?                  @unique
-  whatsappLinkedAt   DateTime?
   role               Role                     @default(EMPLOYEE)
   tenantId           String?
   tenant             Tenant?                  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   staffProfile       Staff?                   @relation("UserStaff")
-  whatsappChatLogs   WhatsAppChatLog[]
   passwordResets     PasswordResetToken[]
   emailVerifications EmailVerificationToken[]
   createdAt          DateTime                 @default(now())
@@ -137,7 +119,6 @@ model Tenant {
   name                 String
   logoUrl              String?
   whatsapp             String?
-  whatsappChatbotMode  WhatsAppChatbotMode    @default(DISABLED)
   location             String?
   onboardingDone       Boolean                @default(false)
   onboardingStep       Int                    @default(0)
@@ -157,7 +138,6 @@ model Tenant {
   bookings             Booking[]
   billingPayments      TenantBillingPayment[]
   expenses             TenantExpense[]
-  whatsappChatLogs     WhatsAppChatLog[]
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
 
@@ -311,21 +291,3 @@ model TenantExpense {
   @@index([tenantId, kind, expenseDate])
 }
 
-model WhatsAppChatLog {
-  id             String              @id @default(cuid())
-  tenantId       String?
-  tenant         Tenant?             @relation(fields: [tenantId], references: [id], onDelete: SetNull)
-  userId         String?
-  user           User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
-  phoneNumber    String
-  inboundText    String
-  replyText      String?
-  detectedIntent String?
-  outcome        WhatsAppChatOutcome
-  metadata       Json?
-  createdAt      DateTime            @default(now())
-
-  @@index([tenantId, createdAt])
-  @@index([userId, createdAt])
-  @@index([phoneNumber, createdAt])
-}

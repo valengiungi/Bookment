@@ -63,7 +63,3 @@ export function canExportData(storedTier: string): boolean {
 export function canViewRevenueInsights(storedTier: string): boolean {
   return planDefinitionForTenant(storedTier).allowRevenueInsights;
 }
-
-export function canUseWhatsAppChatbot(storedTier: string): boolean {
-  return planDefinitionForTenant(storedTier).allowWhatsAppChatbot;
-}

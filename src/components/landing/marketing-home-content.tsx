@@ -519,27 +519,7 @@ export function MarketingHomeContent({
           viewport={{ once: true, margin: "0px 0px -48px 0px", amount: 0.2 }}
           transition={{ duration: reduce ? 0 : 0.35, ease: easeOut }}
         >
-          <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-2 px-4">
-            <Link
-              href="/privacy"
-              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
-            >
-              Política de privacidad
-            </Link>
-            <Link
-              href="/terms"
-              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
-            >
-              Condiciones del servicio
-            </Link>
-            <Link
-              href="/data-deletion"
-              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
-            >
-              Eliminación de datos
-            </Link>
-          </div>
-          <p className="mt-4">© {new Date().getFullYear()} Bookment</p>
+          <p>© {new Date().getFullYear()} Bookment</p>
         </m.footer>
       </>
     </LazyMotion>

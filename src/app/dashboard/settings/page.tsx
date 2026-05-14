@@ -1,7 +1,6 @@
 import { auth } from "@/auth";
 import { getPublicAppOrigin } from "@/lib/public-app-url";
 import { prisma } from "@/lib/prisma";
-import { getEffectivePlanId } from "@/lib/plans";
 import { createStaff } from "@/app/dashboard/actions";
 import { StaffItemActions } from "./staff-item-actions";
 import { InactiveStaffActions } from "./inactive-staff-actions";
@@ -11,8 +10,6 @@ import { WhatsappEditPanel } from "./whatsapp-edit-panel";
 import { DeleteTenantPanel } from "./delete-tenant-panel";
 import { AccountEmailPanel } from "./account-email-panel";
 import { AccountPasswordPanel } from "./account-password-panel";
-import { AccountWhatsappPanel } from "./account-whatsapp-panel";
-import { WhatsAppChatbotPanel } from "./whatsapp-chatbot-panel";
 
 export default async function SettingsPage({
   searchParams,
@@ -51,13 +48,6 @@ export default async function SettingsPage({
         logoUrl: true,
         whatsapp: true,
         subscriptionTier: true,
-        whatsappChatbotMode: true,
-        users: {
-          select: {
-            id: true,
-            whatsappNumber: true,
-          },
-        },
       },
     }),
     prisma.staff.findMany({
@@ -70,14 +60,13 @@ export default async function SettingsPage({
         user: {
           select: {
             email: true,
-            whatsappNumber: true,
           },
         },
       },
     }),
     prisma.user.findUnique({
       where: { id: userId },
-      select: { email: true, whatsappNumber: true },
+      select: { email: true },
     }),
   ]);
 
@@ -86,8 +75,6 @@ export default async function SettingsPage({
   const origin = getPublicAppOrigin();
 
   const isOwner = session.user.role === "OWNER";
-  const isPremium = getEffectivePlanId(tenant.subscriptionTier) === "premium";
-  const linkedAccountsCount = tenant.users.filter((tenantUser) => tenantUser.whatsappNumber).length;
   const staffAccessFeedback =
     staffAccess === "created"
       ? {
@@ -179,22 +166,6 @@ export default async function SettingsPage({
         <WhatsappEditPanel initialWhatsapp={tenant.whatsapp} />
       </section>
 
-      {isOwner ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-4">
-          <h2 className="font-medium text-slate-900">Asistente de WhatsApp</h2>
-          <p className="mt-2 text-xs text-slate-500">
-            Funciona con un número oficial compartido de Bookment y responde solo consultas de
-            agenda. No cancela ni reprograma turnos.
-          </p>
-          <WhatsAppChatbotPanel
-            mode={tenant.whatsappChatbotMode}
-            isPremium={isPremium}
-            businessWhatsapp={tenant.whatsapp}
-            linkedAccountsCount={linkedAccountsCount}
-          />
-        </section>
-      ) : null}
-
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
         <h2 className="font-medium text-slate-900">Cuenta</h2>
         {accountEmail === "ok" ? (
@@ -238,13 +209,6 @@ export default async function SettingsPage({
           <AccountEmailPanel currentEmail={user.email} />
         </div>
         <div className="mt-4 border-t border-slate-100 pt-3">
-          <p className="text-sm font-medium text-slate-800">WhatsApp personal</p>
-          <p className="mt-1 text-xs text-slate-500">
-            Vinculalo para consultar tu agenda por WhatsApp si el asistente está activo.
-          </p>
-          <AccountWhatsappPanel currentWhatsapp={user.whatsappNumber ?? null} />
-        </div>
-        <div className="mt-4 border-t border-slate-100 pt-3">
           <p className="text-sm font-medium text-slate-800">Contraseña</p>
           <AccountPasswordPanel />
         </div>
@@ -283,11 +247,6 @@ export default async function SettingsPage({
                   <p className="mt-1 text-xs text-slate-500">
                     {s.user?.email ? `Acceso creado: ${s.user.email}` : "Todavía no tiene acceso al panel."}
                   </p>
-                  {s.user?.whatsappNumber ? (
-                    <p className="mt-1 text-xs text-slate-500">
-                      WhatsApp vinculado: {s.user.whatsappNumber}
-                    </p>
-                  ) : null}
                 </div>
                 {s.active ? (
                   <StaffItemActions staffId={s.id} name={s.name} />
@@ -301,7 +260,6 @@ export default async function SettingsPage({
                   staffId={s.id}
                   staffName={s.name}
                   currentEmail={s.user?.email ?? null}
-                  currentWhatsapp={s.user?.whatsappNumber ?? null}
                   feedback={staffTarget === s.id ? staffAccessFeedback : null}
                 />
               ) : null}

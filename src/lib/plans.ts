@@ -28,8 +28,6 @@ export type PlanDefinition = {
    * En Simple el turno solo queda cargado: el dueño lo ve al entrar al panel.
    */
   notifyBusinessOnPublicBooking: boolean;
-  /** Consultas internas de agenda por WhatsApp con número vinculado. */
-  allowWhatsAppChatbot: boolean;
 };
 
 export const PLANS: Record<PlanId, PlanDefinition> = {
@@ -43,7 +41,6 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     allowDataExport: false,
     allowRevenueInsights: false,
     notifyBusinessOnPublicBooking: false,
-    allowWhatsAppChatbot: false,
   },
   premium: {
     id: "premium",
@@ -55,7 +52,6 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     allowDataExport: true,
     allowRevenueInsights: true,
     notifyBusinessOnPublicBooking: true,
-    allowWhatsAppChatbot: true,
   },
 };
 
