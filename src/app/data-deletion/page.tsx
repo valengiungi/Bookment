@@ -8,12 +8,28 @@ export const metadata: Metadata = {
   description: "Instrucciones para solicitar la eliminación de datos asociados a Bookment.",
 };
 
-export default function DataDeletionPage() {
+export default async function DataDeletionPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ code?: string }>;
+}) {
+  const { code } = await searchParams;
+
   return (
     <LegalPageShell
       title="Eliminación de datos"
       description="Si querés solicitar la eliminación de datos asociados a Bookment, seguí estas instrucciones."
     >
+      {code ? (
+        <section className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4">
+          <h2 className="text-lg font-semibold text-emerald-950">Solicitud registrada</h2>
+          <p className="mt-2 text-sm text-emerald-900">
+            Tu solicitud quedó registrada con el código <strong>{code}</strong>. Guardalo para
+            futuras consultas sobre el estado del pedido.
+          </p>
+        </section>
+      ) : null}
+
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-slate-900">1. Cómo pedir la eliminación</h2>
         <p>
