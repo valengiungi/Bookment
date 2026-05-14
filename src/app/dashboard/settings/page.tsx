@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { createStaff } from "@/app/dashboard/actions";
 import { StaffItemActions } from "./staff-item-actions";
 import { InactiveStaffActions } from "./inactive-staff-actions";
+import { StaffAccessPanel } from "./staff-access-panel";
 import { LogoEditPanel } from "./logo-edit-panel";
 import { WhatsappEditPanel } from "./whatsapp-edit-panel";
 import { DeleteTenantPanel } from "./delete-tenant-panel";
@@ -19,9 +20,19 @@ export default async function SettingsPage({
     accountPassword?: string;
     deleteTenant?: string;
     planLimit?: string;
+    staffAccess?: string;
+    staffTarget?: string;
   }>;
 }) {
-  const { staffPurge, accountEmail, accountPassword, deleteTenant, planLimit } = await searchParams;
+  const {
+    staffPurge,
+    accountEmail,
+    accountPassword,
+    deleteTenant,
+    planLimit,
+    staffAccess,
+    staffTarget,
+  } = await searchParams;
   const session = await auth();
   const tenantId = session?.user.tenantId;
   const userId = session?.user.id;
@@ -29,7 +40,20 @@ export default async function SettingsPage({
 
   const [tenant, staff, user] = await Promise.all([
     prisma.tenant.findUnique({ where: { id: tenantId } }),
-    prisma.staff.findMany({ where: { tenantId }, orderBy: { createdAt: "asc" } }),
+    prisma.staff.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        name: true,
+        active: true,
+        user: {
+          select: {
+            email: true,
+          },
+        },
+      },
+    }),
     prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
   ]);
 
@@ -38,6 +62,58 @@ export default async function SettingsPage({
   const origin = getPublicAppOrigin();
 
   const isOwner = session.user.role === "OWNER";
+  const staffAccessFeedback =
+    staffAccess === "created"
+      ? {
+          tone: "success" as const,
+          text: "Acceso creado correctamente.",
+        }
+      : staffAccess === "updated"
+        ? {
+            tone: "success" as const,
+            text: "Acceso actualizado correctamente.",
+          }
+        : staffAccess === "invalidEmail"
+          ? {
+              tone: "warning" as const,
+              text: "Ingresá un email válido para el profesional.",
+            }
+        : staffAccess === "used"
+          ? {
+              tone: "error" as const,
+              text: "Ese email ya está en uso por otra cuenta.",
+            }
+          : staffAccess === "passwordRequired"
+            ? {
+                tone: "warning" as const,
+                text: "Para crear la cuenta del profesional tenés que definir una contraseña.",
+              }
+          : staffAccess === "short"
+            ? {
+                tone: "warning" as const,
+                text: "La contraseña debe tener al menos 8 caracteres.",
+              }
+            : staffAccess === "invalid"
+              ? {
+                  tone: "warning" as const,
+                  text: "Revisá el email y la contraseña ingresados.",
+                }
+              : staffAccess === "missing"
+                ? {
+                    tone: "error" as const,
+                    text: "No encontramos ese profesional.",
+                  }
+                : staffAccess === "error"
+                  ? {
+                      tone: "error" as const,
+                      text: "No se pudo crear la cuenta del profesional. Probá de nuevo.",
+                    }
+                : staffAccess === "forbidden"
+                  ? {
+                      tone: "error" as const,
+                      text: "No tenés permiso para gestionar accesos de profesionales.",
+                    }
+                  : null;
 
   return (
     <div className="space-y-8">
@@ -140,24 +216,40 @@ export default async function SettingsPage({
         ) : null}
         <ul className="mt-3 divide-y divide-slate-100">
           {staff.map((s) => (
-            <li key={s.id} className="flex flex-col gap-2 py-2 sm:flex-row sm:justify-between">
-              <p className="text-sm text-slate-800">
-                {s.name}{" "}
-                <span
-                  className={`ml-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
-                    s.active
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-rose-100 text-rose-700"
-                  }`}
-                >
-                  {s.active ? "Activo" : "Inactivo"}
-                </span>
-              </p>
-              {s.active ? (
-                <StaffItemActions staffId={s.id} name={s.name} />
-              ) : (
-                <InactiveStaffActions staffId={s.id} name={s.name} />
-              )}
+            <li key={s.id} className="py-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm text-slate-800">
+                    {s.name}{" "}
+                    <span
+                      className={`ml-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        s.active
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-rose-100 text-rose-700"
+                      }`}
+                    >
+                      {s.active ? "Activo" : "Inactivo"}
+                    </span>
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {s.user?.email ? `Acceso creado: ${s.user.email}` : "Todavía no tiene acceso al panel."}
+                  </p>
+                </div>
+                {s.active ? (
+                  <StaffItemActions staffId={s.id} name={s.name} />
+                ) : (
+                  <InactiveStaffActions staffId={s.id} name={s.name} />
+                )}
+              </div>
+
+              {isOwner ? (
+                <StaffAccessPanel
+                  staffId={s.id}
+                  staffName={s.name}
+                  currentEmail={s.user?.email ?? null}
+                  feedback={staffTarget === s.id ? staffAccessFeedback : null}
+                />
+              ) : null}
             </li>
           ))}
         </ul>

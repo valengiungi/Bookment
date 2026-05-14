@@ -8,6 +8,8 @@ export default auth((req) => {
   const { pathname } = req.nextUrl;
   const loggedIn = !!req.auth;
   const role = req.auth?.user?.role;
+  const employeeAllowedDashboardPath =
+    pathname === "/dashboard" || /^\/dashboard\/bookings\/[^/]+\/edit$/.test(pathname);
 
   if (pathname.startsWith("/dashboard")) {
     if (!loggedIn) {
@@ -18,6 +20,9 @@ export default auth((req) => {
     }
     if (!req.auth?.user?.tenantId) {
       return NextResponse.redirect(new URL("/login", req.url));
+    }
+    if (role === "EMPLOYEE" && !employeeAllowedDashboardPath) {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
     }
   }
 

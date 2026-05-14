@@ -46,6 +46,8 @@ export function DashboardHomeLive({
   initialServiceCount,
   isPremium,
   businessName,
+  isEmployeeView,
+  employeeName,
 }: {
   timeZone: string;
   monthKey: string;
@@ -63,6 +65,8 @@ export function DashboardHomeLive({
   initialUpcoming: number;
   initialStaffCount: number;
   initialServiceCount: number;
+  isEmployeeView: boolean;
+  employeeName: string | null;
 }) {
   const [todayYmd, setTodayYmd] = useState(todayYmdInitial);
   const [counts, setCounts] = useState(initialCounts);
@@ -76,6 +80,19 @@ export function DashboardHomeLive({
     () => formatCalendarDayHeading(dateYmd, timeZone),
     [dateYmd, timeZone],
   );
+  const statCards = isEmployeeView
+    ? [
+        ["Mis turnos hoy", String(todayCount)],
+        ["Próximos turnos", String(upcoming)],
+        ["Días con turnos este mes", String(Object.keys(counts).length)],
+        ["Agenda", employeeName ?? "Profesional"],
+      ]
+    : [
+        ["Turnos hoy", String(todayCount)],
+        ["Turnos confirmados", String(upcoming)],
+        ["Profesionales activos", String(staffCount)],
+        ["Servicios activos", String(serviceCount)],
+      ];
 
   const fetchLive = useCallback(async () => {
     const url = `/api/dashboard/inicio-live?month=${encodeURIComponent(monthKey)}&date=${encodeURIComponent(dateYmd)}`;
@@ -113,12 +130,7 @@ export function DashboardHomeLive({
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          ["Turnos hoy", String(todayCount)],
-          ["Turnos confirmados", String(upcoming)],
-          ["Profesionales activos", String(staffCount)],
-          ["Servicios activos", String(serviceCount)],
-        ].map(([label, value]) => (
+        {statCards.map(([label, value]) => (
           <div
             key={label}
             className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
@@ -132,7 +144,9 @@ export function DashboardHomeLive({
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <h2 className="text-lg font-semibold text-slate-900">Calendario</h2>
         <p className="mt-1 text-sm text-slate-600">
-          Elegí un día en el calendario y mirá los turnos en la lista.
+          {isEmployeeView
+            ? "Elegí un día y mirá únicamente los turnos que te asignaron."
+            : "Elegí un día en el calendario y mirá los turnos en la lista."}
         </p>
 
         <div className="mt-6 flex flex-col gap-8 lg:grid lg:grid-cols-[26rem_minmax(0,1fr)] lg:items-start lg:gap-8">

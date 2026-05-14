@@ -3,6 +3,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { BookingStatus } from "@/generated/prisma";
+import { getDashboardActor, getEmployeeStaffId, isEmployeeRole } from "@/lib/dashboard-actor";
 import { prisma } from "@/lib/prisma";
 import { getEffectivePlanId } from "@/lib/plans";
 import { defaultTimeZone } from "@/lib/timezone";
@@ -16,7 +17,14 @@ export default async function EditBookingPage({
   const { id } = await params;
   const session = await auth();
   const tenantId = session?.user?.tenantId;
-  if (!tenantId) redirect("/login");
+  const userId = session?.user?.id;
+  if (!tenantId || !userId) redirect("/login");
+  const actor = await getDashboardActor(userId, tenantId);
+  if (!actor) redirect("/login");
+  const employeeStaffId = getEmployeeStaffId(actor);
+  if (isEmployeeRole(actor.role) && !employeeStaffId) {
+    redirect("/dashboard");
+  }
 
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
@@ -28,19 +36,34 @@ export default async function EditBookingPage({
   }
 
   const booking = await prisma.booking.findFirst({
-    where: { id, tenantId, status: BookingStatus.CONFIRMED },
+    where: {
+      id,
+      tenantId,
+      status: BookingStatus.CONFIRMED,
+      ...(employeeStaffId ? { staffId: employeeStaffId } : {}),
+    },
     include: { service: true, staff: true },
   });
   if (!booking) notFound();
 
   const [services, staff] = await Promise.all([
     prisma.service.findMany({
-      where: { tenantId, active: true },
+      where: employeeStaffId
+        ? tenant.sameServicesAllStaff
+          ? { tenantId, active: true }
+          : {
+              tenantId,
+              active: true,
+              staffAssignments: { some: { staffId: employeeStaffId } },
+            }
+        : { tenantId, active: true },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
     prisma.staff.findMany({
-      where: { tenantId, active: true },
+      where: employeeStaffId
+        ? { tenantId, active: true, id: employeeStaffId }
+        : { tenantId, active: true },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
@@ -83,6 +106,7 @@ export default async function EditBookingPage({
         staff={staff}
         sameServicesAllStaff={tenant.sameServicesAllStaff}
         staffIdsByService={staffIdsByService}
+        staffLocked={!!employeeStaffId}
       />
     </div>
   );

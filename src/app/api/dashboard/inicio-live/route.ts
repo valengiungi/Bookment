@@ -2,16 +2,25 @@ import { addDays, addMonths } from "date-fns";
 import { formatInTimeZone, toDate } from "date-fns-tz";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { getDashboardActor, getEmployeeStaffId, isEmployeeRole } from "@/lib/dashboard-actor";
 import { prisma } from "@/lib/prisma";
 import { defaultTimeZone } from "@/lib/timezone";
 
 export async function GET(req: Request) {
   const session = await auth();
-  if (!session?.user?.tenantId) {
+  if (!session?.user?.tenantId || !session.user.id) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
   const tenantId = session.user.tenantId;
+  const actor = await getDashboardActor(session.user.id, tenantId);
+  if (!actor) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+  const employeeStaffId = getEmployeeStaffId(actor);
+  if (isEmployeeRole(actor.role) && !employeeStaffId) {
+    return NextResponse.json({ error: "Perfil no disponible" }, { status: 403 });
+  }
   const tz = defaultTimeZone;
 
   const { searchParams } = new URL(req.url);
@@ -44,6 +53,7 @@ export async function GET(req: Request) {
       prisma.booking.count({
         where: {
           tenantId,
+          ...(employeeStaffId ? { staffId: employeeStaffId } : {}),
           status: "CONFIRMED",
           startsAt: { gte: start, lt: end },
         },
@@ -51,15 +61,30 @@ export async function GET(req: Request) {
       prisma.booking.count({
         where: {
           tenantId,
+          ...(employeeStaffId ? { staffId: employeeStaffId } : {}),
           status: "CONFIRMED",
           startsAt: { gte: new Date() },
         },
       }),
-      prisma.staff.count({ where: { tenantId, active: true } }),
-      prisma.service.count({ where: { tenantId, active: true } }),
+      employeeStaffId
+        ? prisma.staff.count({ where: { id: employeeStaffId, tenantId, active: true } })
+        : prisma.staff.count({ where: { tenantId, active: true } }),
+      employeeStaffId
+        ? prisma.service.count({
+            where: {
+              tenantId,
+              active: true,
+              OR: [
+                { bookings: { some: { staffId: employeeStaffId } } },
+                { staffAssignments: { some: { staffId: employeeStaffId } } },
+              ],
+            },
+          })
+        : prisma.service.count({ where: { tenantId, active: true } }),
       prisma.booking.findMany({
         where: {
           tenantId,
+          ...(employeeStaffId ? { staffId: employeeStaffId } : {}),
           status: "CONFIRMED",
           startsAt: { gte: rangeStart, lt: rangeEnd },
         },
@@ -68,6 +93,7 @@ export async function GET(req: Request) {
       prisma.booking.findMany({
         where: {
           tenantId,
+          ...(employeeStaffId ? { staffId: employeeStaffId } : {}),
           status: "CONFIRMED",
           startsAt: { gte: dayStart, lt: dayEnd },
         },

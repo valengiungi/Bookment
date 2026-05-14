@@ -31,6 +31,12 @@ enum TenantBillingCycle {
   ANNUAL
 }
 
+enum TenantExpenseKind {
+  FIXED_ONE_TIME
+  FIXED_MONTHLY
+  DYNAMIC
+}
+
 model User {
   id             String    @id @default(cuid())
   email          String    @unique
@@ -131,6 +137,7 @@ model Tenant {
   blockedSlots     BlockedSlot[]
   bookings         Booking[]
   billingPayments  TenantBillingPayment[]
+  expenses         TenantExpense[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -266,4 +273,20 @@ model TenantBillingPayment {
 
   @@index([tenantId, paidAt])
   @@index([tenantId, nextDueAt])
+}
+
+model TenantExpense {
+  id          String            @id @default(cuid())
+  tenantId    String
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kind        TenantExpenseKind
+  name        String
+  amountArs   Int
+  expenseDate DateTime
+  note        String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([tenantId, expenseDate])
+  @@index([tenantId, kind, expenseDate])
 }

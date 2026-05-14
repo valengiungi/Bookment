@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { LoadingButton } from "@/components/loading-button";
 import { MarketingHeader } from "@/components/marketing-header";
@@ -53,7 +53,10 @@ export default function LoginPage() {
     }
 
     showToast("Ingreso exitoso", "success");
-    window.location.assign(safeCallback);
+    const session = await getSession();
+    const nextHref =
+      session?.user?.role === "OWNER" && !session.user.tenantId ? "/onboarding" : safeCallback;
+    window.location.assign(nextHref);
   }
 
   return (

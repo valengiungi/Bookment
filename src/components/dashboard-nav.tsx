@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { Role } from "@/generated/prisma";
 
-const links = [
+const ownerLinks = [
   { href: "/dashboard", label: "Inicio" },
+  { href: "/dashboard/expenses", label: "Gastos" },
   { href: "/dashboard/services", label: "Servicios" },
   { href: "/dashboard/hours", label: "Horarios" },
   { href: "/dashboard/history", label: "Historial" },
@@ -13,8 +15,12 @@ const links = [
   { href: "/dashboard/settings", label: "Ajustes" },
 ];
 
-export function DashboardNav({ publicHref }: { publicHref: string }) {
+const employeeLinks = [{ href: "/dashboard", label: "Inicio" }];
+
+export function DashboardNav({ publicHref, role }: { publicHref: string; role: Role }) {
   const pathname = usePathname();
+  const links = role === "EMPLOYEE" ? employeeLinks : ownerLinks;
+
   return (
     <nav className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-2 py-2 sm:flex-wrap sm:px-4">
@@ -34,14 +40,16 @@ export function DashboardNav({ publicHref }: { publicHref: string }) {
             </Link>
           );
         })}
-        <Link
-          href={publicHref}
-          target="_blank"
-          rel="noreferrer"
-          className="hidden sm:ml-auto sm:inline-flex shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50"
-        >
-          Abrir página pública
-        </Link>
+        {role !== "EMPLOYEE" ? (
+          <Link
+            href={publicHref}
+            target="_blank"
+            rel="noreferrer"
+            className="hidden sm:ml-auto sm:inline-flex shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50"
+          >
+            Abrir página pública
+          </Link>
+        ) : null}
       </div>
     </nav>
   );

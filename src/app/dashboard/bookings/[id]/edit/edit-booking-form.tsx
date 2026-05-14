@@ -13,6 +13,7 @@ export function EditBookingForm({
   staff,
   sameServicesAllStaff,
   staffIdsByService,
+  staffLocked,
 }: {
   bookingId: string;
   initialServiceId: string;
@@ -22,6 +23,7 @@ export function EditBookingForm({
   staff: { id: string; name: string }[];
   sameServicesAllStaff: boolean;
   staffIdsByService: Record<string, string[]> | null;
+  staffLocked: boolean;
 }) {
   const router = useRouter();
   const [serviceId, setServiceId] = useState(initialServiceId);
@@ -87,19 +89,31 @@ export function EditBookingForm({
         <label htmlFor="edit-staff" className="block text-sm font-medium text-slate-700">
           Profesional
         </label>
-        <select
-          id="edit-staff"
-          name="staffId"
-          value={staffId}
-          onChange={(e) => setStaffId(e.target.value)}
-          className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-        >
-          {staffOptions.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
+        {staffLocked ? (
+          <>
+            <input type="hidden" name="staffId" value={staffId} />
+            <input
+              id="edit-staff"
+              value={staffOptions[0]?.name ?? staff[0]?.name ?? ""}
+              disabled
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 shadow-sm"
+            />
+          </>
+        ) : (
+          <select
+            id="edit-staff"
+            name="staffId"
+            value={staffId}
+            onChange={(e) => setStaffId(e.target.value)}
+            className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+          >
+            {staffOptions.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div>

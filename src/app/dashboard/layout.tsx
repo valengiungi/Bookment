@@ -8,6 +8,7 @@ import {
   BOOKMENT_ADMIN_PHONE,
   bookmentAdminBlockedAccountHref,
 } from "@/lib/admin-contact";
+import { getDashboardActor, isEmployeeRole } from "@/lib/dashboard-actor";
 import { withDbRetry } from "@/lib/db-retry";
 import { prisma } from "@/lib/prisma";
 import { getEffectivePlanId } from "@/lib/plans";
@@ -21,23 +22,31 @@ export default async function DashboardLayout({
 }) {
   const session = await auth();
   const tenantId = session?.user?.tenantId;
-  if (!tenantId) {
+  const userId = session?.user?.id;
+  if (!tenantId || !userId) {
     redirect("/login");
   }
 
-  const tenant = await withDbRetry(() =>
-    prisma.tenant.findUnique({
-      where: { id: tenantId },
-    }),
+  const [tenant, actor] = await withDbRetry(() =>
+    Promise.all([
+      prisma.tenant.findUnique({
+        where: { id: tenantId },
+      }),
+      getDashboardActor(userId, tenantId),
+    ]),
   );
+  if (!actor) {
+    redirect("/login");
+  }
 
   if (!tenant?.onboardingDone) {
     redirect("/onboarding");
   }
 
+  const isEmployee = isEmployeeRole(actor.role);
   const planId = getEffectivePlanId(tenant.subscriptionTier);
   const monthlyBookingsUsed =
-    planId === "simple"
+    !isEmployee && planId === "simple"
       ? await confirmedStartsThisMonthCount(tenantId, defaultTimeZone)
       : undefined;
   const blockedAccountHref = bookmentAdminBlockedAccountHref();
@@ -104,12 +113,46 @@ export default async function DashboardLayout({
     );
   }
 
+  if (isEmployee && !actor.staffProfile?.active) {
+    return (
+      <div className="flex min-h-full flex-col bg-[color:var(--background)]">
+        <header className="border-b border-slate-200 bg-white">
+          <div className="mx-auto flex max-w-6xl items-start justify-between gap-2 px-4 py-3">
+            <div className="min-w-0">
+              <span className="text-lg font-semibold text-slate-900">{tenant.name}</span>
+              <p className="truncate text-xs text-slate-500">Perfil de profesional deshabilitado</p>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <UserBar email={session.user.email} />
+            </div>
+          </div>
+        </header>
+        <div className="mx-auto flex w-full max-w-3xl flex-1 items-center px-4 py-10">
+          <div className="w-full rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-700">
+              Acceso pausado
+            </div>
+            <h1 className="mt-4 text-2xl font-semibold text-slate-900">
+              Tu perfil no está disponible
+            </h1>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600 sm:text-base">
+              Por ahora no podés usar la agenda. Pedile al dueño del negocio que revise tu acceso
+              de profesional dentro de Bookment.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-full flex-col bg-[color:var(--background)]">
-      <PlanStripe
-        subscriptionTier={tenant.subscriptionTier}
-        monthlyBookingsUsed={monthlyBookingsUsed}
-      />
+      {!isEmployee ? (
+        <PlanStripe
+          subscriptionTier={tenant.subscriptionTier}
+          monthlyBookingsUsed={monthlyBookingsUsed}
+        />
+      ) : null}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-start justify-between gap-2 px-4 py-3">
           <div className="min-w-0">
@@ -117,14 +160,16 @@ export default async function DashboardLayout({
               {tenant.name}
             </Link>
             <p className="truncate text-xs text-slate-500">
-              Público: /{tenant.slug}
+              {isEmployee && actor.staffProfile
+                ? `Agenda de ${actor.staffProfile.name}`
+                : `Público: /${tenant.slug}`}
             </p>
           </div>
           <div className="flex flex-col items-end gap-1">
             <UserBar email={session.user.email} />
           </div>
         </div>
-        <DashboardNav publicHref={`/${tenant.slug}`} />
+        <DashboardNav publicHref={`/${tenant.slug}`} role={actor.role} />
       </header>
       <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</div>
     </div>

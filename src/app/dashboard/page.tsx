@@ -3,6 +3,7 @@ import { formatInTimeZone, toDate } from "date-fns-tz";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { withDbRetry } from "@/lib/db-retry";
+import { getDashboardActor, getEmployeeStaffId, isEmployeeRole } from "@/lib/dashboard-actor";
 import { prisma } from "@/lib/prisma";
 import { formatCalendarMonthTitle } from "@/lib/calendar-display";
 import { getEffectivePlanId } from "@/lib/plans";
@@ -27,8 +28,17 @@ export default async function DashboardHomePage({
   const sp = await searchParams;
   const session = await auth();
   const tenantId = session?.user?.tenantId;
-  if (!tenantId) {
+  const userId = session?.user?.id;
+  if (!tenantId || !userId) {
     redirect("/login");
+  }
+  const actor = await getDashboardActor(userId, tenantId);
+  if (!actor) {
+    redirect("/login");
+  }
+  const employeeStaffId = getEmployeeStaffId(actor);
+  if (isEmployeeRole(actor.role) && !employeeStaffId) {
+    redirect("/dashboard");
   }
   const tz = defaultTimeZone;
 
@@ -82,6 +92,7 @@ export default async function DashboardHomePage({
       prisma.booking.count({
         where: {
           tenantId,
+          ...(employeeStaffId ? { staffId: employeeStaffId } : {}),
           status: "CONFIRMED",
           startsAt: { gte: todayWindowStart, lt: todayWindowEnd },
         },
@@ -89,15 +100,30 @@ export default async function DashboardHomePage({
       prisma.booking.count({
         where: {
           tenantId,
+          ...(employeeStaffId ? { staffId: employeeStaffId } : {}),
           status: "CONFIRMED",
           startsAt: { gte: new Date() },
         },
       }),
-      prisma.staff.count({ where: { tenantId, active: true } }),
-      prisma.service.count({ where: { tenantId, active: true } }),
+      employeeStaffId
+        ? prisma.staff.count({ where: { id: employeeStaffId, tenantId, active: true } })
+        : prisma.staff.count({ where: { tenantId, active: true } }),
+      employeeStaffId
+        ? prisma.service.count({
+            where: {
+              tenantId,
+              active: true,
+              OR: [
+                { bookings: { some: { staffId: employeeStaffId } } },
+                { staffAssignments: { some: { staffId: employeeStaffId } } },
+              ],
+            },
+          })
+        : prisma.service.count({ where: { tenantId, active: true } }),
       prisma.booking.findMany({
         where: {
           tenantId,
+          ...(employeeStaffId ? { staffId: employeeStaffId } : {}),
           status: "CONFIRMED",
           startsAt: { gte: rangeStart, lt: rangeEnd },
         },
@@ -106,6 +132,7 @@ export default async function DashboardHomePage({
       prisma.booking.findMany({
         where: {
           tenantId,
+          ...(employeeStaffId ? { staffId: employeeStaffId } : {}),
           status: "CONFIRMED",
           startsAt: { gte: dayStart, lt: dayEnd },
         },
@@ -135,7 +162,9 @@ export default async function DashboardHomePage({
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Resumen</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">
+          {isEmployeeRole(actor.role) ? "Mi agenda" : "Resumen"}
+        </h1>
         <p className="mt-1 text-sm text-slate-600 capitalize">
           {new Date().toLocaleDateString("es-AR", {
             weekday: "long",
@@ -163,6 +192,8 @@ export default async function DashboardHomePage({
         initialUpcoming={upcoming}
         initialStaffCount={staffCount}
         initialServiceCount={serviceCount}
+        isEmployeeView={isEmployeeRole(actor.role)}
+        employeeName={actor.staffProfile?.name ?? null}
       />
     </div>
   );

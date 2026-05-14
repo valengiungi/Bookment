@@ -6,7 +6,8 @@ import { redirect, RedirectType } from "next/navigation";
 import { compare, hash } from "bcryptjs";
 import { z } from "zod";
 import { auth, signOut } from "@/auth";
-import { BlockReason, BookingStatus } from "@/generated/prisma";
+import { BlockReason, BookingStatus, Role, TenantExpenseKind } from "@/generated/prisma";
+import { getDashboardActor, getEmployeeStaffId, isEmployeeRole } from "@/lib/dashboard-actor";
 import { prisma } from "@/lib/prisma";
 import { getEffectivePlanId } from "@/lib/plans";
 import { canCreateService, canCreateStaff } from "@/lib/plan-limits";
@@ -26,12 +27,46 @@ function readBlockRange(formData: FormData, dateKey: string, timeKey: string, tz
   return parseDatetimeLocalToUtc(`${d}T${t}`, tz);
 }
 
-export async function cancelBooking(bookingId: string) {
+const staffAccessSchema = z.object({
+  staffId: z.string().trim().min(1),
+  email: z.string().trim().email().transform((value) => value.toLowerCase()),
+  password: z.string(),
+});
+
+const expenseSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  kind: z.enum(["FIXED_ONE_TIME", "FIXED_MONTHLY", "DYNAMIC"] as const),
+  amountArs: z.coerce.number().int().positive(),
+  expenseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  note: z.string().trim().max(600).optional(),
+});
+
+export type StaffAccessFormState = {
+  tone: "idle" | "success" | "error" | "warning";
+  text: string | null;
+};
+
+async function getActionActor() {
   const session = await auth();
-  if (!session?.user?.tenantId) return;
+  if (!session?.user?.tenantId || !session.user.id) {
+    return null;
+  }
+
+  return getDashboardActor(session.user.id, session.user.tenantId);
+}
+
+export async function cancelBooking(bookingId: string) {
+  const actor = await getActionActor();
+  if (!actor) return;
+  const employeeStaffId = getEmployeeStaffId(actor);
+  if (isEmployeeRole(actor.role) && !employeeStaffId) return;
 
   const booking = await prisma.booking.findFirst({
-    where: { id: bookingId, tenantId: session.user.tenantId },
+    where: {
+      id: bookingId,
+      tenantId: actor.tenantId,
+      ...(employeeStaffId ? { staffId: employeeStaffId } : {}),
+    },
   });
   if (!booking) return;
 
@@ -45,11 +80,16 @@ export async function cancelBooking(bookingId: string) {
 }
 
 export async function updateBookingFromDashboard(formData: FormData) {
-  const session = await auth();
-  if (!session?.user?.tenantId) {
+  const actor = await getActionActor();
+  if (!actor) {
     return { ok: false as const, message: "No autorizado" };
   }
-  const tenantId = session.user.tenantId;
+  const employeeStaffId = getEmployeeStaffId(actor);
+  if (isEmployeeRole(actor.role) && !employeeStaffId) {
+    return { ok: false as const, message: "Tu perfil no está disponible." };
+  }
+
+  const tenantId = actor.tenantId;
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
     select: { subscriptionTier: true },
@@ -60,11 +100,25 @@ export async function updateBookingFromDashboard(formData: FormData) {
 
   const bookingId = String(formData.get("bookingId") ?? "").trim();
   const serviceId = String(formData.get("serviceId") ?? "").trim();
-  const staffId = String(formData.get("staffId") ?? "").trim();
+  const staffId = employeeStaffId ?? String(formData.get("staffId") ?? "").trim();
   const startsLocal = String(formData.get("startsAt") ?? "").trim();
   if (!bookingId || !serviceId || !staffId || !startsLocal) {
     return { ok: false as const, message: "Completá todos los campos." };
   }
+
+  const booking = await prisma.booking.findFirst({
+    where: {
+      id: bookingId,
+      tenantId,
+      status: BookingStatus.CONFIRMED,
+      ...(employeeStaffId ? { staffId: employeeStaffId } : {}),
+    },
+    select: { id: true },
+  });
+  if (!booking) {
+    return { ok: false as const, message: "No encontramos ese turno." };
+  }
+
   const tz = defaultTimeZone;
   const startsAt = parseDatetimeLocalToUtc(startsLocal, tz);
   if (!startsAt) {
@@ -444,7 +498,7 @@ export async function updateStaffServiceAssignments(formData: FormData) {
 
 export async function createStaff(formData: FormData) {
   const session = await auth();
-  if (!session?.user?.tenantId) return;
+  if (!session?.user?.tenantId || session.user.role !== "OWNER") return;
 
   const tenant = await prisma.tenant.findUnique({
     where: { id: session.user.tenantId },
@@ -469,7 +523,7 @@ export async function createStaff(formData: FormData) {
 
 export async function updateStaff(formData: FormData) {
   const session = await auth();
-  if (!session?.user?.tenantId) return;
+  if (!session?.user?.tenantId || session.user.role !== "OWNER") return;
 
   const staffId = String(formData.get("staffId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
@@ -477,13 +531,22 @@ export async function updateStaff(formData: FormData) {
 
   const staff = await prisma.staff.findFirst({
     where: { id: staffId, tenantId: session.user.tenantId },
-    select: { id: true },
+    select: { id: true, userId: true },
   });
   if (!staff) return;
 
-  await prisma.staff.update({
-    where: { id: staff.id },
-    data: { name },
+  await prisma.$transaction(async (tx) => {
+    await tx.staff.update({
+      where: { id: staff.id },
+      data: { name },
+    });
+
+    if (staff.userId) {
+      await tx.user.update({
+        where: { id: staff.userId },
+        data: { name },
+      });
+    }
   });
 
   revalidatePath("/dashboard/settings");
@@ -491,7 +554,7 @@ export async function updateStaff(formData: FormData) {
 
 export async function deleteStaff(formData: FormData) {
   const session = await auth();
-  if (!session?.user?.tenantId) return;
+  if (!session?.user?.tenantId || session.user.role !== "OWNER") return;
 
   const staffId = String(formData.get("staffId") ?? "");
   if (!staffId) return;
@@ -514,7 +577,7 @@ export async function deleteStaff(formData: FormData) {
 
 export async function reactivateStaff(formData: FormData) {
   const session = await auth();
-  if (!session?.user?.tenantId) return;
+  if (!session?.user?.tenantId || session.user.role !== "OWNER") return;
 
   const staffId = String(formData.get("staffId") ?? "");
   if (!staffId) return;
@@ -536,14 +599,14 @@ export async function reactivateStaff(formData: FormData) {
 
 export async function permanentlyDeleteStaff(formData: FormData) {
   const session = await auth();
-  if (!session?.user?.tenantId) return;
+  if (!session?.user?.tenantId || session.user.role !== "OWNER") return;
 
   const staffId = String(formData.get("staffId") ?? "");
   if (!staffId) return;
 
   const staff = await prisma.staff.findFirst({
     where: { id: staffId, tenantId: session.user.tenantId },
-    select: { id: true, active: true },
+    select: { id: true, active: true, userId: true },
   });
   if (!staff || staff.active) {
     redirect("/dashboard/settings?staffPurge=forbidden");
@@ -556,10 +619,178 @@ export async function permanentlyDeleteStaff(formData: FormData) {
     redirect("/dashboard/settings?staffPurge=bookings");
   }
 
-  await prisma.staff.delete({ where: { id: staff.id } });
+  await prisma.$transaction(async (tx) => {
+    await tx.staff.delete({ where: { id: staff.id } });
+    if (staff.userId) {
+      await tx.user.deleteMany({
+        where: {
+          id: staff.userId,
+          tenantId: session.user.tenantId,
+          role: Role.EMPLOYEE,
+        },
+      });
+    }
+  });
 
   revalidatePath("/dashboard/settings");
   revalidatePath("/dashboard/hours");
+}
+
+export async function upsertStaffAccess(
+  _prevState: StaffAccessFormState,
+  formData: FormData,
+): Promise<StaffAccessFormState> {
+  const session = await auth();
+  if (!session?.user?.tenantId || session.user.role !== "OWNER") {
+    return {
+      tone: "error",
+      text: "No tenés permiso para gestionar accesos de profesionales.",
+    };
+  }
+
+  const rawStaffId = String(formData.get("staffId") ?? "").trim();
+  const rawEmail = String(formData.get("email") ?? "").trim();
+  const rawPassword = String(formData.get("password") ?? "");
+
+  if (!rawStaffId) {
+    return {
+      tone: "error",
+      text: "No encontramos ese profesional.",
+    };
+  }
+
+  const parsed = staffAccessSchema.safeParse({
+    staffId: rawStaffId,
+    email: rawEmail,
+    password: rawPassword,
+  });
+  if (!parsed.success) {
+    const hasInvalidEmail = parsed.error.issues.some((issue) => issue.path.includes("email"));
+    return {
+      tone: "warning",
+      text: hasInvalidEmail
+        ? "Ingresá un email válido para el profesional."
+        : "Revisá el email y la contraseña ingresados.",
+    };
+  }
+
+  const { staffId, email, password } = parsed.data;
+  const tenantId = session.user.tenantId;
+  const staff = await prisma.staff.findFirst({
+    where: { id: staffId, tenantId },
+    select: {
+      id: true,
+      name: true,
+      userId: true,
+      user: {
+        select: {
+          id: true,
+          email: true,
+        },
+      },
+    },
+  });
+  if (!staff) {
+    return {
+      tone: "error",
+      text: "No encontramos ese profesional.",
+    };
+  }
+
+  const emailOwner = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true },
+  });
+  if (emailOwner && emailOwner.id !== staff.userId) {
+    return {
+      tone: "error",
+      text: "Ese email ya está en uso por otra cuenta.",
+    };
+  }
+
+  const shouldUpdatePassword = password.trim().length > 0;
+  if (!staff.userId && !shouldUpdatePassword) {
+    return {
+      tone: "warning",
+      text: "Para crear la cuenta del profesional tenés que definir una contraseña.",
+    };
+  }
+  if (!staff.userId && password.trim().length < 8) {
+    return {
+      tone: "warning",
+      text: "La contraseña debe tener al menos 8 caracteres.",
+    };
+  }
+  if (shouldUpdatePassword && password.trim().length < 8) {
+    return {
+      tone: "warning",
+      text: "La contraseña debe tener al menos 8 caracteres.",
+    };
+  }
+
+  const passwordHash = shouldUpdatePassword ? await hash(password.trim(), 10) : null;
+
+  try {
+    if (staff.userId) {
+      await prisma.user.update({
+        where: { id: staff.userId },
+        data: {
+          email,
+          emailVerified: new Date(),
+          name: staff.name,
+          role: Role.EMPLOYEE,
+          tenantId,
+          ...(passwordHash ? { passwordHash } : {}),
+        },
+      });
+
+      revalidatePath("/dashboard/settings");
+      return {
+        tone: "success",
+        text: "Acceso actualizado correctamente.",
+      };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          email,
+          emailVerified: new Date(),
+          passwordHash: passwordHash!,
+          name: staff.name,
+          role: Role.EMPLOYEE,
+          tenantId,
+        },
+      });
+
+      await tx.staff.update({
+        where: { id: staff.id },
+        data: { userId: createdUser.id },
+      });
+    });
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error &&
+      "code" in error &&
+      (error as { code?: string }).code === "P2002"
+    ) {
+      return {
+        tone: "error",
+        text: "Ese email ya está en uso por otra cuenta.",
+      };
+    }
+    return {
+      tone: "error",
+      text: "No se pudo crear la cuenta del profesional. Probá de nuevo.",
+    };
+  }
+
+  revalidatePath("/dashboard/settings");
+  return {
+    tone: "success",
+    text: "Acceso creado correctamente.",
+  };
 }
 
 export async function updateWorkingHours(formData: FormData) {
@@ -712,6 +943,63 @@ export async function updateAccountPassword(formData: FormData) {
 
   revalidatePath("/dashboard/settings");
   redirect("/dashboard/settings?accountPassword=ok");
+}
+
+export async function createExpense(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId || session.user.role !== "OWNER") {
+    redirect("/dashboard");
+  }
+
+  const parsed = expenseSchema.safeParse({
+    name: formData.get("name"),
+    kind: formData.get("kind"),
+    amountArs: formData.get("amountArs"),
+    expenseDate: formData.get("expenseDate"),
+    note: formData.get("note"),
+  });
+  if (!parsed.success) {
+    redirect("/dashboard/expenses?expenseMsg=invalid");
+  }
+
+  const expenseDate = new Date(`${parsed.data.expenseDate}T12:00:00.000Z`);
+  const note = parsed.data.note?.trim() || null;
+
+  await prisma.tenantExpense.create({
+    data: {
+      tenantId: session.user.tenantId,
+      name: parsed.data.name,
+      kind: parsed.data.kind as TenantExpenseKind,
+      amountArs: parsed.data.amountArs,
+      expenseDate,
+      note,
+    },
+  });
+
+  revalidatePath("/dashboard/expenses");
+  redirect("/dashboard/expenses?expenseMsg=created");
+}
+
+export async function deleteExpense(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId || session.user.role !== "OWNER") {
+    redirect("/dashboard");
+  }
+
+  const expenseId = String(formData.get("expenseId") ?? "").trim();
+  if (!expenseId) {
+    redirect("/dashboard/expenses?expenseMsg=invalid");
+  }
+
+  await prisma.tenantExpense.deleteMany({
+    where: {
+      id: expenseId,
+      tenantId: session.user.tenantId,
+    },
+  });
+
+  revalidatePath("/dashboard/expenses");
+  redirect("/dashboard/expenses?expenseMsg=deleted");
 }
 
 export async function deleteTenantPermanently(formData: FormData) {
