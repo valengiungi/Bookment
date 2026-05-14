@@ -10,6 +10,8 @@ import {
 import { prisma } from "@/lib/prisma";
 import { isPlanId } from "@/lib/plans";
 
+const DELETE_WORD = "ELIMINAR";
+
 async function requireSuperAdmin() {
   const s = await auth();
   if (s?.user?.role !== "SUPER_ADMIN") {
@@ -17,6 +19,11 @@ async function requireSuperAdmin() {
   }
   return s;
 }
+
+export type DeleteAdminTenantFormState = {
+  tone: "idle" | "success" | "error" | "warning";
+  text: string | null;
+};
 
 export async function setTenantActiveAction(tenantId: string, active: boolean) {
   const session = await requireSuperAdmin();
@@ -113,4 +120,70 @@ export async function saveTenantBillingPaymentAction(formData: FormData) {
   revalidatePath("/admin/tenants");
   revalidatePath(`/admin/tenants/${tenantId}`);
   return { ok: true as const };
+}
+
+export async function deleteTenantFromAdminAction(
+  _prevState: DeleteAdminTenantFormState,
+  formData: FormData,
+): Promise<DeleteAdminTenantFormState> {
+  const session = await requireSuperAdmin();
+  if (!session) {
+    return { tone: "error", text: "No autorizado." };
+  }
+
+  const tenantId = String(formData.get("tenantId") ?? "").trim();
+  const confirmName = String(formData.get("confirmName") ?? "").trim();
+  const confirmPhrase = String(formData.get("confirmPhrase") ?? "").trim();
+  const understood = String(formData.get("understood") ?? "") === "yes";
+
+  if (!tenantId) {
+    return { tone: "error", text: "Negocio no válido." };
+  }
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { id: true, name: true },
+  });
+  if (!tenant) {
+    return { tone: "error", text: "No encontramos ese negocio." };
+  }
+
+  if (confirmName !== tenant.name) {
+    return {
+      tone: "warning",
+      text: "El nombre del negocio no coincide exactamente.",
+    };
+  }
+
+  if (confirmPhrase !== DELETE_WORD) {
+    return {
+      tone: "warning",
+      text: `Tenés que escribir ${DELETE_WORD} en mayúsculas.`,
+    };
+  }
+
+  if (!understood) {
+    return {
+      tone: "warning",
+      text: "Marcá la casilla de confirmación para continuar.",
+    };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.staff.updateMany({
+      where: { tenantId },
+      data: { userId: null },
+    });
+    await tx.user.deleteMany({ where: { tenantId } });
+    await tx.tenant.delete({ where: { id: tenantId } });
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/tenants");
+  revalidatePath(`/admin/tenants/${tenantId}`);
+
+  return {
+    tone: "success",
+    text: "Negocio eliminado permanentemente.",
+  };
 }

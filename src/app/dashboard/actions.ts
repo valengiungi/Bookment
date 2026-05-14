@@ -33,6 +33,11 @@ const staffAccessSchema = z.object({
   password: z.string(),
 });
 
+const staffCommissionSchema = z.object({
+  staffId: z.string().trim().min(1),
+  commissionPercent: z.coerce.number().int().min(0).max(100),
+});
+
 const expenseSchema = z.object({
   name: z.string().trim().min(2).max(120),
   kind: z.enum(["FIXED_ONE_TIME", "FIXED_MONTHLY", "DYNAMIC"] as const),
@@ -47,6 +52,7 @@ export type InlineFormState = {
 };
 
 export type StaffAccessFormState = InlineFormState;
+export type StaffCommissionFormState = InlineFormState;
 
 async function getActionActor() {
   const session = await auth();
@@ -552,6 +558,59 @@ export async function updateStaff(formData: FormData) {
   });
 
   revalidatePath("/dashboard/settings");
+}
+
+export async function updateStaffCommission(
+  _prevState: StaffCommissionFormState,
+  formData: FormData,
+): Promise<StaffCommissionFormState> {
+  const session = await auth();
+  if (!session?.user?.tenantId || session.user.role !== "OWNER") {
+    return {
+      tone: "error",
+      text: "No tenés permiso para editar la comisión.",
+    };
+  }
+
+  const parsed = staffCommissionSchema.safeParse({
+    staffId: formData.get("staffId"),
+    commissionPercent: formData.get("commissionPercent"),
+  });
+
+  if (!parsed.success) {
+    return {
+      tone: "warning",
+      text: "Ingresá un porcentaje válido entre 0 y 100.",
+    };
+  }
+
+  const staff = await prisma.staff.findFirst({
+    where: {
+      id: parsed.data.staffId,
+      tenantId: session.user.tenantId,
+    },
+    select: { id: true },
+  });
+
+  if (!staff) {
+    return {
+      tone: "error",
+      text: "No encontramos ese profesional.",
+    };
+  }
+
+  await prisma.staff.update({
+    where: { id: staff.id },
+    data: { commissionPercent: parsed.data.commissionPercent },
+  });
+
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard/history");
+
+  return {
+    tone: "success",
+    text: "Comisión actualizada correctamente.",
+  };
 }
 
 export async function deleteStaff(formData: FormData) {

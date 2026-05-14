@@ -34,7 +34,10 @@ export function HistoryExportPanel({ enabled }: { enabled: boolean }) {
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
-      showToast("Listo: descargaste un Excel (.xlsx) con turnos, gastos y balance", "success");
+      showToast(
+        "Listo: descargaste un Excel (.xlsx) con turnos, gastos, comisiones y balance",
+        "success",
+      );
     } finally {
       setLoading(false);
     }
@@ -51,8 +54,8 @@ export function HistoryExportPanel({ enabled }: { enabled: boolean }) {
             </div>
             <p className="text-sm leading-relaxed text-slate-700">
               Archivo <strong className="text-violet-950">Excel .xlsx</strong>: hoja{" "}
-              <em>Turnos</em> con columnas y filtros; hoja <em>Gastos</em> con egresos cargados;
-              hoja <em>Balance</em> con ingresos estimados, gastos y neto.
+              <em>Turnos</em> con columnas y filtros; hoja <em>Gastos</em> con egresos cargados y
+              comisiones calculadas; hoja <em>Balance</em> con ingresos estimados, gastos y neto.
             </p>
           </div>
           <button
@@ -77,7 +80,7 @@ export function HistoryExportPanel({ enabled }: { enabled: boolean }) {
         <span className="mt-0.5 text-violet-600" aria-hidden>
           ✓
         </span>
-        Tablas con bordes, totales y tres hojas (turnos + gastos + balance).
+        Tablas con bordes, totales y tres hojas (turnos + gastos/comisiones + balance).
       </p>
       <p className="flex items-start gap-2">
         <span className="mt-0.5 text-violet-600" aria-hidden>

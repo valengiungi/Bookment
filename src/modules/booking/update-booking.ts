@@ -2,6 +2,7 @@ import { addMinutes } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { BookingStatus } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma";
+import { buildBookingFinancialSnapshots } from "@/lib/staff-commissions";
 import { jsDayOfWeekForYmd, POST_SERVICE_BUFFER_MINUTES } from "@/modules/calendar/slots";
 import { defaultTimeZone } from "@/lib/timezone";
 import { staffOffersService } from "@/lib/staff-services";
@@ -117,6 +118,10 @@ export async function updateBooking(input: UpdateBookingInput) {
         data: {
           serviceId: input.serviceId,
           staffId: input.staffId,
+          ...buildBookingFinancialSnapshots({
+            servicePriceCents: service.priceCents,
+            commissionPercent: staff.commissionPercent,
+          }),
           startsAt: input.startsAt,
           endsAt,
         },

@@ -3,6 +3,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { BookingStatus, type Prisma } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma";
 import { canAcceptAnotherBooking } from "@/lib/plan-limits";
+import { buildBookingFinancialSnapshots } from "@/lib/staff-commissions";
 import { jsDayOfWeekForYmd, POST_SERVICE_BUFFER_MINUTES } from "@/modules/calendar/slots";
 import { defaultTimeZone } from "@/lib/timezone";
 import { staffOffersService } from "@/lib/staff-services";
@@ -125,6 +126,10 @@ export async function createBooking(input: CreateBookingInput) {
         customerName: input.customerName.trim(),
         customerPhone: input.customerPhone.trim(),
         customerEmail: input.customerEmail?.trim() || null,
+        ...buildBookingFinancialSnapshots({
+          servicePriceCents: service.priceCents,
+          commissionPercent: staff.commissionPercent,
+        }),
         startsAt: input.startsAt,
         endsAt,
         reminders: {

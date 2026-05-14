@@ -1,6 +1,10 @@
 import { formatInTimeZone } from "date-fns-tz";
 import ExcelJS from "exceljs";
 import { TenantExpenseKind } from "@/generated/prisma";
+import {
+  groupCommissionExpensesByStaffDay,
+  resolveBookingServicePriceCents,
+} from "@/lib/staff-commissions";
 
 const ACCENT = "FF0D9488"; // teal-600
 const ACCENT_LIGHT = "FFCCFBF4";
@@ -85,12 +89,16 @@ function expenseKindLabel(kind: TenantExpenseKind): string {
 }
 
 export type BookingExportRow = {
+  staffId: string;
   startsAt: Date;
   customerName: string;
   customerPhone: string;
   customerEmail: string | null;
+  servicePriceCentsSnapshot: number | null;
+  staffCommissionPercentSnapshot: number | null;
+  staffPayoutArsSnapshot: number | null;
   service: { name: string; priceCents: number | null };
-  staff: { name: string };
+  staff: { name: string; commissionPercent: number };
 };
 
 export type ExpenseExportRow = {
@@ -109,6 +117,26 @@ export async function buildHistoryExportXlsxBuffer(args: {
 }): Promise<Buffer> {
   const { tenantName, tz, bookings, expenses } = args;
   const generatedAt = formatInTimeZone(new Date(), tz, "dd/MM/yyyy HH:mm");
+  const commissionExpenses = groupCommissionExpensesByStaffDay(bookings, tz);
+  const combinedExpenses = [
+    ...expenses.map((expense) => ({
+      expenseDate: expense.expenseDate,
+      kindLabel: expenseKindLabel(expense.kind),
+      name: expense.name,
+      amountArs: expense.amountArs,
+      note: expense.note,
+    })),
+    ...commissionExpenses.map((expense) => ({
+      expenseDate: expense.expenseDate,
+      kindLabel: "Comisión profesional",
+      name: `Pago por comisión a ${expense.staffName}`,
+      amountArs: expense.amountArs,
+      note: `${expense.bookingsCount} turno${expense.bookingsCount === 1 ? "" : "s"} del día`,
+    })),
+  ].sort((a, b) => {
+    const diff = b.expenseDate.getTime() - a.expenseDate.getTime();
+    return diff !== 0 ? diff : a.name.localeCompare(b.name, "es-AR");
+  });
 
   let totalCents = 0;
   let totalExpensesArs = 0;
@@ -161,7 +189,7 @@ export async function buildHistoryExportXlsxBuffer(args: {
 
   turnos.mergeCells("A4:H4");
   turnos.getCell("A4").value =
-    "Orden: turnos más recientes primero. Importes según precio configurado en cada servicio.";
+    "Orden: turnos más recientes primero. Importes según snapshot del turno cuando existe; si no, se usa el precio actual del servicio.";
   turnos.getCell("A4").font = { size: 10, color: { argb: "FF64748B" } };
   turnos.getCell("A4").alignment = { vertical: "middle", indent: 1, wrapText: true };
 
@@ -197,7 +225,7 @@ export async function buildHistoryExportXlsxBuffer(args: {
 
   let rowNum = 7;
   for (const b of bookings) {
-    const lineCents = b.service.priceCents ?? 0;
+    const lineCents = resolveBookingServicePriceCents(b);
     totalCents += lineCents;
     const ars = formatArsFromCents(lineCents);
     const r = turnos.getRow(rowNum);
@@ -286,7 +314,7 @@ export async function buildHistoryExportXlsxBuffer(args: {
 
   gastos.mergeCells("A4:E4");
   gastos.getCell("A4").value =
-    "Incluye gastos fijos únicos, fijos mensuales y dinámicos cargados en el panel.";
+    "Incluye gastos manuales cargados en el panel y pagos calculados por comisión a profesionales.";
   gastos.getCell("A4").font = { size: 10, color: { argb: "FF64748B" } };
   gastos.getCell("A4").alignment = { vertical: "middle", indent: 1, wrapText: true };
 
@@ -311,13 +339,13 @@ export async function buildHistoryExportXlsxBuffer(args: {
   });
 
   let expenseRowNum = 7;
-  for (const expense of expenses) {
+  for (const expense of combinedExpenses) {
     totalExpensesArs += expense.amountArs;
     const r = gastos.getRow(expenseRowNum);
     r.height = DATA_ROW_MIN_H;
     const cells = [
       formatInTimeZone(expense.expenseDate, tz, "yyyy-MM-dd"),
-      expenseKindLabel(expense.kind),
+      expense.kindLabel,
       expense.name,
       formatArs(expense.amountArs),
       expense.note ?? "",
@@ -341,7 +369,7 @@ export async function buildHistoryExportXlsxBuffer(args: {
 
   const lastExpenseRow = expenseRowNum - 1;
 
-  if (expenses.length === 0) {
+  if (combinedExpenses.length === 0) {
     gastos.mergeCells(`A${expenseRowNum}:E${expenseRowNum}`);
     const empty = gastos.getCell(`A${expenseRowNum}`);
     empty.value = "No hay gastos registrados para exportar.";
@@ -415,7 +443,7 @@ export async function buildHistoryExportXlsxBuffer(args: {
 
   const summaryRows: [string, string, "normal" | "highlight"][] = [
     ["Turnos incluidos en la hoja «Turnos»", String(n), "normal"],
-    ["Gastos incluidos en la hoja «Gastos»", String(expenses.length), "normal"],
+    ["Gastos incluidos en la hoja «Gastos»", String(combinedExpenses.length), "normal"],
     ["Ingresos estimados ($)", formatArs(incomeArs), "normal"],
     ["Gastos registrados ($)", formatArs(totalExpensesArs), "normal"],
     ["Balance neto estimado ($)", formatArs(netArs), "highlight"],

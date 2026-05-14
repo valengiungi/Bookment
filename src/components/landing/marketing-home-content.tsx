@@ -20,7 +20,7 @@ const frictionRows: [string, string][] = [
   ],
   [
     "Cierre de mes con información dispersa entre planillas y archivos sueltos.",
-    "Historial con totales y promedios en el mismo panel; exportación a Excel con turnos, gastos y balance para presentar o archivar.",
+    "Historial con totales y promedios en el mismo panel; exportación a Excel con turnos, gastos, comisiones y balance para presentar o archivar.",
   ],
   [
     "Enterarte de una confirmación nueva con demora.",
@@ -431,7 +431,7 @@ export function MarketingHomeContent({
                     items={[
                       "Sin tope de turnos, servicios ni tamaño de equipo",
                       "Métricas de plata estimada y ranking de clientes en tu historial",
-                      "Descargá tus reservas en un archivo para Excel o planillas (turnos confirmados)",
+                      "Descargá tus reservas en un archivo para Excel o planillas con turnos, gastos, comisiones y balance",
                       "Aviso por WhatsApp al negocio cuando alguien reserva por el link público",
                     ]}
                   />
@@ -463,7 +463,7 @@ export function MarketingHomeContent({
                   ],
                   [
                     "¿Qué información puedo revisar para cerrar el mes?",
-                    "En Historial ves turnos, totales y promedios, y podés exportar un archivo de trabajo con el detalle de reservas y balance para análisis administrativo.",
+                    "En Historial ves turnos, totales y promedios, y podés exportar un archivo de trabajo con reservas, gastos, comisiones y balance para análisis administrativo.",
                   ],
                   [
                     "¿Cómo me entero cuando entra una reserva nueva?",

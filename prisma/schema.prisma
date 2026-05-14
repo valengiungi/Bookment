@@ -152,6 +152,7 @@ model Staff {
   user          User?          @relation("UserStaff", fields: [userId], references: [id])
   name          String
   title         String?
+  commissionPercent Int        @default(0)
   active        Boolean        @default(true)
   bookings      Booking[]
   workingHours  WorkingHour[]
@@ -233,6 +234,9 @@ model Booking {
   customerName  String
   customerPhone String
   customerEmail String?
+  servicePriceCentsSnapshot Int?
+  staffCommissionPercentSnapshot Int?
+  staffPayoutArsSnapshot Int?
   startsAt      DateTime
   endsAt        DateTime
   status        BookingStatus @default(CONFIRMED)

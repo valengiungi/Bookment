@@ -1,10 +1,15 @@
+import { addDays } from "date-fns";
+import { formatInTimeZone, toDate } from "date-fns-tz";
 import { auth } from "@/auth";
 import { getPublicAppOrigin } from "@/lib/public-app-url";
 import { prisma } from "@/lib/prisma";
+import { sumStaffPayoutsByStaff } from "@/lib/staff-commissions";
+import { defaultTimeZone } from "@/lib/timezone";
 import { createStaff } from "@/app/dashboard/actions";
 import { StaffItemActions } from "./staff-item-actions";
 import { InactiveStaffActions } from "./inactive-staff-actions";
 import { StaffAccessPanel } from "./staff-access-panel";
+import { StaffCommissionPanel } from "./staff-commission-panel";
 import { LogoEditPanel } from "./logo-edit-panel";
 import { WhatsappEditPanel } from "./whatsapp-edit-panel";
 import { DeleteTenantPanel } from "./delete-tenant-panel";
@@ -37,8 +42,11 @@ export default async function SettingsPage({
   const tenantId = session?.user.tenantId;
   const userId = session?.user.id;
   if (!tenantId || !userId) return null;
+  const todayYmd = formatInTimeZone(new Date(), defaultTimeZone, "yyyy-MM-dd");
+  const todayStart = toDate(`${todayYmd}T00:00:00`, { timeZone: defaultTimeZone });
+  const todayEnd = addDays(todayStart, 1);
 
-  const [tenant, staff, user] = await Promise.all([
+  const [tenant, staff, user, todayBookings] = await Promise.all([
     prisma.tenant.findUnique({
       where: { id: tenantId },
       select: {
@@ -57,6 +65,7 @@ export default async function SettingsPage({
         id: true,
         name: true,
         active: true,
+        commissionPercent: true,
         user: {
           select: {
             email: true,
@@ -68,11 +77,33 @@ export default async function SettingsPage({
       where: { id: userId },
       select: { email: true },
     }),
+    prisma.booking.findMany({
+      where: {
+        tenantId,
+        status: "CONFIRMED",
+        startsAt: { gte: todayStart, lt: todayEnd },
+      },
+      select: {
+        staffId: true,
+        servicePriceCentsSnapshot: true,
+        staffCommissionPercentSnapshot: true,
+        staffPayoutArsSnapshot: true,
+        service: {
+          select: { priceCents: true },
+        },
+        staff: {
+          select: { commissionPercent: true },
+        },
+      },
+    }),
   ]);
 
   if (!tenant || !user) return null;
 
   const origin = getPublicAppOrigin();
+  const todayPayoutsByStaff = sumStaffPayoutsByStaff(todayBookings);
+  const totalTodayPayout = [...todayPayoutsByStaff.values()].reduce((sum, value) => sum + value, 0);
+  const formatArs = (value: number) => `$${value.toLocaleString("es-AR")}`;
 
   const isOwner = session.user.role === "OWNER";
   const staffAccessFeedback =
@@ -215,7 +246,19 @@ export default async function SettingsPage({
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <h2 className="font-medium text-slate-900">Profesionales</h2>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="font-medium text-slate-900">Profesionales</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Definí la comisión de cada barbero y revisá cuánto corresponde pagar hoy.
+            </p>
+          </div>
+          {isOwner ? (
+            <p className="text-sm font-medium text-slate-700">
+              Hoy a pagar: {formatArs(totalTodayPayout)}
+            </p>
+          ) : null}
+        </div>
         {staffPurge === "bookings" ? (
           <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             No se puede borrar un profesional que ya tiene turnos en el historial. Los turnos
@@ -247,6 +290,10 @@ export default async function SettingsPage({
                   <p className="mt-1 text-xs text-slate-500">
                     {s.user?.email ? `Acceso creado: ${s.user.email}` : "Todavía no tiene acceso al panel."}
                   </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Comisión: {s.commissionPercent}% · Hoy a pagar:{" "}
+                    {formatArs(todayPayoutsByStaff.get(s.id) ?? 0)}
+                  </p>
                 </div>
                 {s.active ? (
                   <StaffItemActions staffId={s.id} name={s.name} />
@@ -256,12 +303,19 @@ export default async function SettingsPage({
               </div>
 
               {isOwner ? (
-                <StaffAccessPanel
-                  staffId={s.id}
-                  staffName={s.name}
-                  currentEmail={s.user?.email ?? null}
-                  feedback={staffTarget === s.id ? staffAccessFeedback : null}
-                />
+                <>
+                  <StaffCommissionPanel
+                    staffId={s.id}
+                    staffName={s.name}
+                    currentCommissionPercent={s.commissionPercent}
+                  />
+                  <StaffAccessPanel
+                    staffId={s.id}
+                    staffName={s.name}
+                    currentEmail={s.user?.email ?? null}
+                    feedback={staffTarget === s.id ? staffAccessFeedback : null}
+                  />
+                </>
               ) : null}
             </li>
           ))}

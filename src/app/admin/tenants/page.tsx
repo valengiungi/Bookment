@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { planLabel } from "@/lib/plans";
 import { formatAdminDate } from "./billing-utils";
 import { TenantBillingStatusBadge } from "./tenant-billing-status-badge";
+import { TenantDeleteInlinePanel } from "./tenant-delete-inline-panel";
 import { TenantSearchForm } from "./tenant-search-form";
 
 export const dynamic = "force-dynamic";
@@ -111,7 +112,7 @@ export default async function AdminTenantsPage({
               <th className="px-4 py-2 font-medium">Último pago</th>
               <th className="px-4 py-2 font-medium">Próximo venc.</th>
               <th className="px-4 py-2 font-medium">Estado cobro</th>
-              <th className="px-4 py-2 font-medium w-28" />
+              <th className="px-4 py-2 font-medium w-56" />
             </tr>
           </thead>
           <tbody>
@@ -155,13 +156,16 @@ export default async function AdminTenantsPage({
                       <span className="text-slate-400">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-2 text-right">
-                    <Link
-                      href={`/admin/tenants/${t.id}`}
-                      className="font-medium text-teal-700 hover:underline"
-                    >
-                      Ver ficha
-                    </Link>
+                  <td className="px-4 py-2 text-right align-top">
+                    <div className="flex flex-col items-end gap-2">
+                      <Link
+                        href={`/admin/tenants/${t.id}`}
+                        className="font-medium text-teal-700 hover:underline"
+                      >
+                        Ver ficha
+                      </Link>
+                      <TenantDeleteInlinePanel tenantId={t.id} tenantName={t.name} />
+                    </div>
                   </td>
                       </>
                     );

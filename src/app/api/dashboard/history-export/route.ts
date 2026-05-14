@@ -35,12 +35,16 @@ export async function GET() {
       orderBy: { startsAt: "desc" },
       take: 20_000,
       select: {
+        staffId: true,
         startsAt: true,
         customerName: true,
         customerPhone: true,
         customerEmail: true,
+        servicePriceCentsSnapshot: true,
+        staffCommissionPercentSnapshot: true,
+        staffPayoutArsSnapshot: true,
         service: { select: { name: true, priceCents: true } },
-        staff: { select: { name: true } },
+        staff: { select: { name: true, commissionPercent: true } },
       },
     }),
     prisma.tenantExpense.findMany({

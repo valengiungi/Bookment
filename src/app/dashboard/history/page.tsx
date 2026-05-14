@@ -5,6 +5,7 @@ import { HistorySummaryTabs } from "@/app/dashboard/history/history-summary-tabs
 import { HistoryExportPanel } from "@/app/dashboard/history/history-export-panel";
 import { canExportData, canViewRevenueInsights } from "@/lib/plan-limits";
 import { prisma } from "@/lib/prisma";
+import { resolveBookingServicePriceCents } from "@/lib/staff-commissions";
 import { defaultTimeZone } from "@/lib/timezone";
 
 async function revenueCentsFor(args: {
@@ -12,8 +13,7 @@ async function revenueCentsFor(args: {
   startsAtGte?: Date;
   startsAtLt?: Date;
 }) {
-  const grouped = await prisma.booking.groupBy({
-    by: ["serviceId"],
+  const bookings = await prisma.booking.findMany({
     where: {
       tenantId: args.tenantId,
       status: "CONFIRMED",
@@ -22,23 +22,15 @@ async function revenueCentsFor(args: {
         lt: args.startsAtLt,
       },
     },
-    _count: { _all: true },
-  });
-
-  if (!grouped.length) return 0;
-
-  const services = await prisma.service.findMany({
-    where: {
-      id: { in: grouped.map((g) => g.serviceId) },
+    select: {
+      servicePriceCentsSnapshot: true,
+      service: {
+        select: { priceCents: true },
+      },
     },
-    select: { id: true, priceCents: true },
   });
-  const priceByService = new Map(services.map((s) => [s.id, s.priceCents ?? 0]));
 
-  return grouped.reduce((acc, g) => {
-    const price = priceByService.get(g.serviceId) ?? 0;
-    return acc + price * g._count._all;
-  }, 0);
+  return bookings.reduce((acc, booking) => acc + resolveBookingServicePriceCents(booking), 0);
 }
 
 export default async function HistoryPage({
