@@ -10,10 +10,11 @@ import { BlockReason, BookingStatus, Role, TenantExpenseKind } from "@/generated
 import { getDashboardActor, getEmployeeStaffId, isEmployeeRole } from "@/lib/dashboard-actor";
 import { prisma } from "@/lib/prisma";
 import { getEffectivePlanId } from "@/lib/plans";
-import { canCreateService, canCreateStaff } from "@/lib/plan-limits";
+import { canCreateService, canCreateStaff, canUseWhatsAppChatbot } from "@/lib/plan-limits";
 import { updateBooking as updateBookingCore } from "@/modules/booking/update-booking";
 import { parseDatetimeLocalToUtc } from "@/lib/datetime-local";
 import { defaultTimeZone } from "@/lib/timezone";
+import { normalizeWhatsAppNumber } from "@/lib/whatsapp-phone";
 import {
   linkNewStaffToAllServices,
   linkServiceToAllStaffInPerStaffMode,
@@ -31,6 +32,7 @@ const staffAccessSchema = z.object({
   staffId: z.string().trim().min(1),
   email: z.string().trim().email().transform((value) => value.toLowerCase()),
   password: z.string(),
+  whatsappNumber: z.string().trim().max(40),
 });
 
 const expenseSchema = z.object({
@@ -41,10 +43,14 @@ const expenseSchema = z.object({
   note: z.string().trim().max(600).optional(),
 });
 
-export type StaffAccessFormState = {
+export type InlineFormState = {
   tone: "idle" | "success" | "error" | "warning";
   text: string | null;
 };
+
+export type StaffAccessFormState = InlineFormState;
+export type AccountWhatsappFormState = InlineFormState;
+export type TenantWhatsappChatbotFormState = InlineFormState;
 
 async function getActionActor() {
   const session = await auth();
@@ -651,6 +657,7 @@ export async function upsertStaffAccess(
   const rawStaffId = String(formData.get("staffId") ?? "").trim();
   const rawEmail = String(formData.get("email") ?? "").trim();
   const rawPassword = String(formData.get("password") ?? "");
+  const rawWhatsappNumber = String(formData.get("whatsappNumber") ?? "").trim();
 
   if (!rawStaffId) {
     return {
@@ -663,6 +670,7 @@ export async function upsertStaffAccess(
     staffId: rawStaffId,
     email: rawEmail,
     password: rawPassword,
+    whatsappNumber: rawWhatsappNumber,
   });
   if (!parsed.success) {
     const hasInvalidEmail = parsed.error.issues.some((issue) => issue.path.includes("email"));
@@ -674,8 +682,16 @@ export async function upsertStaffAccess(
     };
   }
 
-  const { staffId, email, password } = parsed.data;
+  const { staffId, email, password, whatsappNumber } = parsed.data;
   const tenantId = session.user.tenantId;
+  const normalizedWhatsapp = normalizeWhatsAppNumber(whatsappNumber);
+  if (!normalizedWhatsapp.ok) {
+    return {
+      tone: "warning",
+      text: normalizedWhatsapp.message,
+    };
+  }
+
   const staff = await prisma.staff.findFirst({
     where: { id: staffId, tenantId },
     select: {
@@ -708,7 +724,22 @@ export async function upsertStaffAccess(
     };
   }
 
+  const whatsappNumberValue = normalizedWhatsapp.value;
+  if (whatsappNumberValue) {
+    const whatsappOwner = await prisma.user.findUnique({
+      where: { whatsappNumber: whatsappNumberValue },
+      select: { id: true },
+    });
+    if (whatsappOwner && whatsappOwner.id !== staff.userId) {
+      return {
+        tone: "error",
+        text: "Ese número de WhatsApp ya está vinculado a otra cuenta.",
+      };
+    }
+  }
+
   const shouldUpdatePassword = password.trim().length > 0;
+  const linkedAtValue = whatsappNumberValue ? new Date() : null;
   if (!staff.userId && !shouldUpdatePassword) {
     return {
       tone: "warning",
@@ -740,6 +771,8 @@ export async function upsertStaffAccess(
           name: staff.name,
           role: Role.EMPLOYEE,
           tenantId,
+          whatsappNumber: whatsappNumberValue,
+          whatsappLinkedAt: linkedAtValue,
           ...(passwordHash ? { passwordHash } : {}),
         },
       });
@@ -760,6 +793,8 @@ export async function upsertStaffAccess(
           name: staff.name,
           role: Role.EMPLOYEE,
           tenantId,
+          whatsappNumber: whatsappNumberValue,
+          whatsappLinkedAt: linkedAtValue,
         },
       });
 
@@ -777,7 +812,7 @@ export async function upsertStaffAccess(
     ) {
       return {
         tone: "error",
-        text: "Ese email ya está en uso por otra cuenta.",
+        text: "Ese email o número de WhatsApp ya está en uso por otra cuenta.",
       };
     }
     return {
@@ -869,6 +904,140 @@ export async function updateTenantWhatsapp(formData: FormData) {
   });
 
   revalidatePath("/dashboard/settings");
+}
+
+export async function updateAccountWhatsapp(
+  _prevState: AccountWhatsappFormState,
+  formData: FormData,
+): Promise<AccountWhatsappFormState> {
+  const session = await auth();
+  if (!session?.user?.id || !session.user.tenantId) {
+    return {
+      tone: "error",
+      text: "No autorizado.",
+    };
+  }
+
+  const rawWhatsappNumber = String(formData.get("whatsappNumber") ?? "").trim();
+  const normalizedWhatsapp = normalizeWhatsAppNumber(rawWhatsappNumber);
+  if (!normalizedWhatsapp.ok) {
+    return {
+      tone: "warning",
+      text: normalizedWhatsapp.message,
+    };
+  }
+
+  try {
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: {
+        whatsappNumber: normalizedWhatsapp.value,
+        whatsappLinkedAt: normalizedWhatsapp.value ? new Date() : null,
+      },
+    });
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error &&
+      "code" in error &&
+      (error as { code?: string }).code === "P2002"
+    ) {
+      return {
+        tone: "error",
+        text: "Ese número de WhatsApp ya está vinculado a otra cuenta.",
+      };
+    }
+    throw error;
+  }
+
+  revalidatePath("/dashboard/settings");
+  return {
+    tone: "success",
+    text: normalizedWhatsapp.value
+      ? "Número de WhatsApp vinculado correctamente."
+      : "Vinculación de WhatsApp eliminada.",
+  };
+}
+
+export async function setTenantWhatsappChatbotMode(
+  _prevState: TenantWhatsappChatbotFormState,
+  formData: FormData,
+): Promise<TenantWhatsappChatbotFormState> {
+  const session = await auth();
+  if (!session?.user?.tenantId || session.user.role !== "OWNER") {
+    return {
+      tone: "error",
+      text: "No tenés permiso para configurar el asistente.",
+    };
+  }
+
+  const nextMode = String(formData.get("mode") ?? "").trim();
+  if (nextMode !== "READ_ONLY" && nextMode !== "DISABLED") {
+    return {
+      tone: "error",
+      text: "Modo de asistente no válido.",
+    };
+  }
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: session.user.tenantId },
+    select: {
+      id: true,
+      subscriptionTier: true,
+      whatsapp: true,
+      users: {
+        where: { whatsappNumber: { not: null } },
+        select: { id: true },
+      },
+    },
+  });
+  if (!tenant) {
+    return {
+      tone: "error",
+      text: "No encontramos el negocio.",
+    };
+  }
+
+  if (!canUseWhatsAppChatbot(tenant.subscriptionTier)) {
+    return {
+      tone: "warning",
+      text: "El asistente de WhatsApp está disponible solo en el plan Premium.",
+    };
+  }
+
+  if (nextMode === "READ_ONLY") {
+    const normalizedBusinessWhatsapp = normalizeWhatsAppNumber(tenant.whatsapp ?? "");
+    if (!normalizedBusinessWhatsapp.ok || !normalizedBusinessWhatsapp.value) {
+      return {
+        tone: "warning",
+        text: "Primero cargá un WhatsApp válido del negocio en formato internacional.",
+      };
+    }
+
+    if (tenant.users.length === 0) {
+      return {
+        tone: "warning",
+        text: "Vinculá al menos un número de WhatsApp a una cuenta antes de activar el asistente.",
+      };
+    }
+  }
+
+  await prisma.tenant.update({
+    where: { id: tenant.id },
+    data: {
+      whatsappChatbotMode: nextMode,
+    },
+  });
+
+  revalidatePath("/dashboard/settings");
+  revalidatePath(`/admin/tenants/${tenant.id}`);
+  return {
+    tone: "success",
+    text:
+      nextMode === "READ_ONLY"
+        ? "Asistente de WhatsApp activado en modo solo lectura."
+        : "Asistente de WhatsApp desactivado.",
+  };
 }
 
 const changeEmailSchema = z.object({

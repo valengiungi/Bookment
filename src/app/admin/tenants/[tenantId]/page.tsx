@@ -32,14 +32,35 @@ export default async function AdminTenantDetailPage({
       slug: true,
       active: true,
       subscriptionTier: true,
+      whatsapp: true,
+      whatsappChatbotMode: true,
       adminNotes: true,
       onboardingDone: true,
       onboardingStep: true,
       createdAt: true,
       updatedAt: true,
       users: {
-        select: { id: true, email: true, name: true, role: true },
+        select: { id: true, email: true, name: true, role: true, whatsappNumber: true },
         orderBy: { createdAt: "asc" },
+      },
+      whatsappChatLogs: {
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          phoneNumber: true,
+          inboundText: true,
+          replyText: true,
+          detectedIntent: true,
+          outcome: true,
+          createdAt: true,
+          user: {
+            select: {
+              email: true,
+              name: true,
+            },
+          },
+        },
       },
       billingPayments: {
         orderBy: [{ paidAt: "desc" }, { createdAt: "desc" }],
@@ -82,6 +103,7 @@ export default async function AdminTenantDetailPage({
   const planDef = planDefinitionForTenant(tenant.subscriptionTier);
   const latestBillingPayment = tenant.billingPayments[0] ?? null;
   const { simple, premium } = await getConfiguredListPrices();
+  const linkedWhatsAppUsers = tenant.users.filter((user) => user.whatsappNumber).length;
 
   return (
     <div className="space-y-8">
@@ -298,6 +320,80 @@ export default async function AdminTenantDetailPage({
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900">Asistente de WhatsApp</h2>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Plan</p>
+            <p className="mt-2 text-lg font-semibold text-slate-900">
+              {planDef.allowWhatsAppChatbot ? "Premium habilitado" : "Bloqueado por plan"}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Modo</p>
+            <p className="mt-2 text-lg font-semibold text-slate-900">
+              {tenant.whatsappChatbotMode === "READ_ONLY" ? "Solo lectura" : "Desactivado"}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              WhatsApp negocio
+            </p>
+            <p className="mt-2 text-sm font-semibold text-slate-900">
+              {tenant.whatsapp ?? "Pendiente"}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Cuentas vinculadas
+            </p>
+            <p className="mt-2 text-lg font-semibold text-slate-900">{linkedWhatsAppUsers}</p>
+          </div>
+        </div>
+        <p className="mt-4 text-sm text-slate-600">
+          Estrategia operativa: número oficial único de Bookment, API oficial de WhatsApp y
+          consultas internas de agenda solamente.
+        </p>
+
+        <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
+          <table className="min-w-full text-left text-sm">
+            <thead className="border-b border-slate-100 bg-slate-50 text-slate-600">
+              <tr>
+                <th className="px-4 py-2 font-medium">Fecha</th>
+                <th className="px-4 py-2 font-medium">Cuenta</th>
+                <th className="px-4 py-2 font-medium">Intento</th>
+                <th className="px-4 py-2 font-medium">Resultado</th>
+                <th className="px-4 py-2 font-medium">Mensaje</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tenant.whatsappChatLogs.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                    Todavía no hay interacciones registradas.
+                  </td>
+                </tr>
+              ) : (
+                tenant.whatsappChatLogs.map((log) => (
+                  <tr key={log.id} className="border-b border-slate-50 align-top">
+                    <td className="px-4 py-3 text-slate-700">{formatAdminDate(log.createdAt)}</td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {log.user?.email ?? log.user?.name ?? log.phoneNumber}
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">{log.detectedIntent ?? "—"}</td>
+                    <td className="px-4 py-3 text-slate-700">{log.outcome}</td>
+                    <td className="px-4 py-3 text-slate-500">
+                      <p className="line-clamp-2">{log.inboundText}</p>
+                      {log.replyText ? <p className="mt-1 line-clamp-2 text-xs">{log.replyText}</p> : null}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">Usuarios del negocio</h2>
         <ul className="mt-3 divide-y divide-slate-100">
           {tenant.users.map((u) => (
@@ -306,6 +402,7 @@ export default async function AdminTenantDetailPage({
               <span className="text-slate-500">
                 {u.name ? `${u.name} · ` : null}
                 {u.role}
+                {u.whatsappNumber ? ` · ${u.whatsappNumber}` : ""}
               </span>
             </li>
           ))}

@@ -37,21 +37,39 @@ enum TenantExpenseKind {
   DYNAMIC
 }
 
+enum WhatsAppChatbotMode {
+  DISABLED
+  READ_ONLY
+}
+
+enum WhatsAppChatOutcome {
+  ANSWERED
+  ACTION_BLOCKED
+  NO_LINK
+  NO_PERMISSION
+  DISABLED
+  UNKNOWN
+  ERROR
+}
+
 model User {
-  id             String    @id @default(cuid())
-  email          String    @unique
-  emailVerified  DateTime?
-  passwordHash   String
-  name           String?
-  image          String?
-  role           Role      @default(EMPLOYEE)
-  tenantId       String?
-  tenant         Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
-  staffProfile   Staff?    @relation("UserStaff")
-  passwordResets PasswordResetToken[]
+  id                 String                   @id @default(cuid())
+  email              String                   @unique
+  emailVerified      DateTime?
+  passwordHash       String
+  name               String?
+  image              String?
+  whatsappNumber     String?                  @unique
+  whatsappLinkedAt   DateTime?
+  role               Role                     @default(EMPLOYEE)
+  tenantId           String?
+  tenant             Tenant?                  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  staffProfile       Staff?                   @relation("UserStaff")
+  whatsappChatLogs   WhatsAppChatLog[]
+  passwordResets     PasswordResetToken[]
   emailVerifications EmailVerificationToken[]
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
 
   @@index([tenantId])
 }
@@ -92,13 +110,13 @@ model SignupInviteCode {
 /// Precios de lista Simple/Premium (ARS). El super admin los edita en /admin/economia.
 /// reporting* y configChangedAt son legacy; el código alinea todo con los precios guardados.
 model PlatformPricing {
-  id                     String    @id
-  configuredSimpleArs    Int
-  configuredPremiumArs   Int
-  reportingSimpleArs     Int
-  reportingPremiumArs    Int
-  configChangedAt        DateTime?
-  updatedAt              DateTime  @updatedAt
+  id                   String    @id
+  configuredSimpleArs  Int
+  configuredPremiumArs Int
+  reportingSimpleArs   Int
+  reportingPremiumArs  Int
+  configChangedAt      DateTime?
+  updatedAt            DateTime  @updatedAt
 }
 
 /// Congelado la primera vez que se abre Economía en cada mes calendario (timezone AR).
@@ -113,70 +131,72 @@ model EconomiaMonthSnapshot {
 }
 
 model Tenant {
-  id               String   @id @default(cuid())
-  slug             String   @unique
-  businessType     String?
-  name             String
-  logoUrl          String?
-  whatsapp         String?
-  location         String?
-  onboardingDone   Boolean  @default(false)
-  onboardingStep   Int      @default(0)
-  subscriptionTier String   @default("simple")
+  id                   String                 @id @default(cuid())
+  slug                 String                 @unique
+  businessType         String?
+  name                 String
+  logoUrl              String?
+  whatsapp             String?
+  whatsappChatbotMode  WhatsAppChatbotMode    @default(DISABLED)
+  location             String?
+  onboardingDone       Boolean                @default(false)
+  onboardingStep       Int                    @default(0)
+  subscriptionTier     String                 @default("simple")
   /// Si es true, todos los profesionales ofrecen los mismos servicios activos (comportamiento clásico).
   /// Si es false, solo aplican las filas en StaffService.
-  sameServicesAllStaff Boolean @default(true)
-  active           Boolean  @default(true)
+  sameServicesAllStaff Boolean                @default(true)
+  active               Boolean                @default(true)
   /// Notas internas del super admin (no se muestran al cliente).
-  adminNotes       String?
-  settings         Json?
-  users            User[]
-  staff            Staff[]
-  services         Service[]
-  workingHours     WorkingHour[]
-  blockedSlots     BlockedSlot[]
-  bookings         Booking[]
-  billingPayments  TenantBillingPayment[]
-  expenses         TenantExpense[]
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  adminNotes           String?
+  settings             Json?
+  users                User[]
+  staff                Staff[]
+  services             Service[]
+  workingHours         WorkingHour[]
+  blockedSlots         BlockedSlot[]
+  bookings             Booking[]
+  billingPayments      TenantBillingPayment[]
+  expenses             TenantExpense[]
+  whatsappChatLogs     WhatsAppChatLog[]
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
 
   @@index([active])
 }
 
 model Staff {
-  id             String        @id @default(cuid())
-  tenantId       String
-  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userId         String?       @unique
-  user           User?         @relation("UserStaff", fields: [userId], references: [id])
-  name           String
-  title          String?
-  active         Boolean       @default(true)
-  bookings       Booking[]
-  workingHours   WorkingHour[]
-  blockedSlots   BlockedSlot[]
-  staffServices  StaffService[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id            String         @id @default(cuid())
+  tenantId      String
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId        String?        @unique
+  user          User?          @relation("UserStaff", fields: [userId], references: [id])
+  name          String
+  title         String?
+  active        Boolean        @default(true)
+  bookings      Booking[]
+  workingHours  WorkingHour[]
+  blockedSlots  BlockedSlot[]
+  staffServices StaffService[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   @@index([tenantId])
   @@index([tenantId, active])
 }
 
 model Service {
-  id              String    @id @default(cuid())
-  tenantId        String
-  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name            String
-  durationMinutes Int
-  priceCents      Int?
-  currency        String    @default("ARS")
-  active          Boolean   @default(true)
-  bookings        Booking[]
+  id               String         @id @default(cuid())
+  tenantId         String
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name             String
+  durationMinutes  Int
+  priceCents       Int?
+  currency         String         @default("ARS")
+  active           Boolean        @default(true)
+  bookings         Booking[]
   staffAssignments StaffService[]
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   @@index([tenantId])
   @@index([tenantId, active])
@@ -194,11 +214,11 @@ model StaffService {
 }
 
 model WorkingHour {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   tenantId  String
-  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   staffId   String?
-  staff     Staff? @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  staff     Staff?  @relation(fields: [staffId], references: [id], onDelete: Cascade)
   dayOfWeek Int
   opensAt   String
   closesAt  String
@@ -223,22 +243,22 @@ model BlockedSlot {
 }
 
 model Booking {
-  id              String        @id @default(cuid())
-  tenantId        String
-  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  serviceId       String
-  service         Service       @relation(fields: [serviceId], references: [id])
-  staffId         String
-  staff           Staff         @relation(fields: [staffId], references: [id])
-  customerName    String
-  customerPhone   String
-  customerEmail   String?
-  startsAt        DateTime
-  endsAt          DateTime
-  status          BookingStatus @default(CONFIRMED)
-  reminders       ReminderJob[]
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id            String        @id @default(cuid())
+  tenantId      String
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  serviceId     String
+  service       Service       @relation(fields: [serviceId], references: [id])
+  staffId       String
+  staff         Staff         @relation(fields: [staffId], references: [id])
+  customerName  String
+  customerPhone String
+  customerEmail String?
+  startsAt      DateTime
+  endsAt        DateTime
+  status        BookingStatus @default(CONFIRMED)
+  reminders     ReminderJob[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   @@index([tenantId, startsAt])
   @@index([staffId, startsAt])
@@ -289,4 +309,23 @@ model TenantExpense {
 
   @@index([tenantId, expenseDate])
   @@index([tenantId, kind, expenseDate])
+}
+
+model WhatsAppChatLog {
+  id             String              @id @default(cuid())
+  tenantId       String?
+  tenant         Tenant?             @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  userId         String?
+  user           User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  phoneNumber    String
+  inboundText    String
+  replyText      String?
+  detectedIntent String?
+  outcome        WhatsAppChatOutcome
+  metadata       Json?
+  createdAt      DateTime            @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+  @@index([phoneNumber, createdAt])
 }

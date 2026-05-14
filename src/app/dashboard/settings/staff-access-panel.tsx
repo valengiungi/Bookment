@@ -9,11 +9,13 @@ export function StaffAccessPanel({
   staffId,
   staffName,
   currentEmail,
+  currentWhatsapp,
   feedback,
 }: {
   staffId: string;
   staffName: string;
   currentEmail?: string | null;
+  currentWhatsapp?: string | null;
   feedback?: {
     tone: "success" | "error" | "warning";
     text: string;
@@ -36,14 +38,18 @@ export function StaffAccessPanel({
 
   useEffect(() => {
     if (state.tone === "success") {
-      setIsOpen(false);
-      router.refresh();
+      const timer = window.setTimeout(() => {
+        setIsOpen(false);
+        router.refresh();
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
   }, [router, state]);
 
   useEffect(() => {
     if (state.tone === "warning" || state.tone === "error") {
-      setIsOpen(true);
+      const timer = window.setTimeout(() => setIsOpen(true), 0);
+      return () => window.clearTimeout(timer);
     }
   }, [state.tone]);
 
@@ -97,6 +103,20 @@ export function StaffAccessPanel({
               {isEditing
                 ? "Dejala vacía si no querés cambiarla."
                 : "Obligatoria para crear el acceso. Mínimo 8 caracteres."}
+            </span>
+          </label>
+
+          <label className="block text-sm text-slate-700 sm:col-span-2">
+            WhatsApp vinculado
+            <input
+              name="whatsappNumber"
+              type="tel"
+              defaultValue={currentWhatsapp ?? ""}
+              placeholder="Ej: +5491123456789"
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+            />
+            <span className="mt-1 block text-xs text-slate-500">
+              Opcional. Si lo cargás, este profesional podrá consultar su agenda desde el chatbot.
             </span>
           </label>
 
