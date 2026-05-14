@@ -11,6 +11,12 @@ export async function GET() {
   if (!tenantId) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+  if (session.user.role === "EMPLOYEE") {
+    return NextResponse.json(
+      { error: "Solo el dueño del negocio puede exportar este Excel." },
+      { status: 403 },
+    );
+  }
 
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
@@ -23,28 +29,43 @@ export async function GET() {
     );
   }
 
-  const bookings = await prisma.booking.findMany({
-    where: { tenantId, status: "CONFIRMED" },
-    orderBy: { startsAt: "desc" },
-    take: 20_000,
-    select: {
-      startsAt: true,
-      customerName: true,
-      customerPhone: true,
-      customerEmail: true,
-      service: { select: { name: true, priceCents: true } },
-      staff: { select: { name: true } },
-    },
-  });
+  const [bookings, expenses] = await Promise.all([
+    prisma.booking.findMany({
+      where: { tenantId, status: "CONFIRMED" },
+      orderBy: { startsAt: "desc" },
+      take: 20_000,
+      select: {
+        startsAt: true,
+        customerName: true,
+        customerPhone: true,
+        customerEmail: true,
+        service: { select: { name: true, priceCents: true } },
+        staff: { select: { name: true } },
+      },
+    }),
+    prisma.tenantExpense.findMany({
+      where: { tenantId },
+      orderBy: [{ expenseDate: "desc" }, { createdAt: "desc" }],
+      take: 20_000,
+      select: {
+        expenseDate: true,
+        kind: true,
+        name: true,
+        amountArs: true,
+        note: true,
+      },
+    }),
+  ]);
 
   const tz = defaultTimeZone;
   const buffer = await buildHistoryExportXlsxBuffer({
     tenantName: tenant.name,
     tz,
     bookings,
+    expenses,
   });
 
-  const filename = `bookment-${tenant.slug}-reservas.xlsx`;
+  const filename = `bookment-${tenant.slug}-historial.xlsx`;
 
   return new NextResponse(new Uint8Array(buffer), {
     status: 200,

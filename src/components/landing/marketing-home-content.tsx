@@ -20,7 +20,7 @@ const frictionRows: [string, string][] = [
   ],
   [
     "Cierre de mes con información dispersa entre planillas y archivos sueltos.",
-    "Historial con totales y promedios en el mismo panel; exportación a Excel con turnos y balance para presentar o archivar.",
+    "Historial con totales y promedios en el mismo panel; exportación a Excel con turnos, gastos y balance para presentar o archivar.",
   ],
   [
     "Enterarte de una confirmación nueva con demora.",

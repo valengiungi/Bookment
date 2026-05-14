@@ -1,5 +1,6 @@
 import { formatInTimeZone } from "date-fns-tz";
 import ExcelJS from "exceljs";
+import { TenantExpenseKind } from "@/generated/prisma";
 
 const ACCENT = "FF0D9488"; // teal-600
 const ACCENT_LIGHT = "FFCCFBF4";
@@ -63,6 +64,26 @@ function formatArsFromCents(cents: number): string {
   });
 }
 
+function formatArs(value: number): string {
+  return value.toLocaleString("es-AR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+}
+
+function expenseKindLabel(kind: TenantExpenseKind): string {
+  switch (kind) {
+    case "FIXED_ONE_TIME":
+      return "Fijo único";
+    case "FIXED_MONTHLY":
+      return "Fijo mensual";
+    case "DYNAMIC":
+      return "Dinámico";
+    default:
+      return kind;
+  }
+}
+
 export type BookingExportRow = {
   startsAt: Date;
   customerName: string;
@@ -72,15 +93,25 @@ export type BookingExportRow = {
   staff: { name: string };
 };
 
+export type ExpenseExportRow = {
+  expenseDate: Date;
+  kind: TenantExpenseKind;
+  name: string;
+  amountArs: number;
+  note: string | null;
+};
+
 export async function buildHistoryExportXlsxBuffer(args: {
   tenantName: string;
   tz: string;
   bookings: BookingExportRow[];
+  expenses: ExpenseExportRow[];
 }): Promise<Buffer> {
-  const { tenantName, tz, bookings } = args;
+  const { tenantName, tz, bookings, expenses } = args;
   const generatedAt = formatInTimeZone(new Date(), tz, "dd/MM/yyyy HH:mm");
 
   let totalCents = 0;
+  let totalExpensesArs = 0;
   const wb = new ExcelJS.Workbook();
   wb.creator = "Bookment";
   wb.created = new Date();
@@ -220,9 +251,119 @@ export async function buildHistoryExportXlsxBuffer(args: {
     turnos.autoFilter = `A${headerRowIndex}:H${lastDataRow}`;
   }
 
+  // --- Gastos ---
+  const gastos = wb.addWorksheet("Gastos", {
+    properties: { tabColor: { argb: "FFEA580C" } },
+    views: [{ state: "frozen", ySplit: 7, xSplit: 0 }],
+  });
+
+  gastos.columns = [{ width: 18 }, { width: 18 }, { width: 34 }, { width: 18 }, { width: 40 }];
+
+  for (let r = 1; r <= metaRows; r++) {
+    gastos.getRow(r).height = r === 1 ? TITLE_ROW_H + 4 : 22;
+    for (let c = 1; c <= 5; c++) {
+      const cell = gastos.getRow(r).getCell(c);
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: META_BG } };
+      cell.border = tableOutline(r, c, 1, metaRows, 1, 5);
+    }
+  }
+
+  gastos.mergeCells("A1:E1");
+  const g1 = gastos.getCell("A1");
+  g1.value = "Gastos registrados";
+  g1.font = { size: 17, bold: true, color: { argb: "FFEA580C" } };
+  g1.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+
+  gastos.mergeCells("A2:E2");
+  gastos.getCell("A2").value = `Negocio: ${tenantName}`;
+  gastos.getCell("A2").font = { size: 12, color: { argb: "FF334155" } };
+  gastos.getCell("A2").alignment = { vertical: "middle", indent: 1, wrapText: true };
+
+  gastos.mergeCells("A3:E3");
+  gastos.getCell("A3").value = `Generado: ${generatedAt} · Zona: ${tz}`;
+  gastos.getCell("A3").font = { size: 10, italic: true, color: { argb: "FF64748B" } };
+  gastos.getCell("A3").alignment = { vertical: "middle", indent: 1 };
+
+  gastos.mergeCells("A4:E4");
+  gastos.getCell("A4").value =
+    "Incluye gastos fijos únicos, fijos mensuales y dinámicos cargados en el panel.";
+  gastos.getCell("A4").font = { size: 10, color: { argb: "FF64748B" } };
+  gastos.getCell("A4").alignment = { vertical: "middle", indent: 1, wrapText: true };
+
+  gastos.getRow(5).height = SPACER_H;
+
+  const expenseHeaders = ["Fecha", "Tipo", "Concepto", "Importe ($)", "Nota"];
+  const expenseHeaderRowIndex = 6;
+  const expenseHeaderRow = gastos.getRow(expenseHeaderRowIndex);
+  expenseHeaderRow.height = HEADER_ROW_H;
+  expenseHeaders.forEach((text, i) => {
+    const c = expenseHeaderRow.getCell(i + 1);
+    c.value = text;
+    c.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEA580C" } };
+    c.alignment = {
+      vertical: "middle",
+      horizontal: i === 3 ? "right" : "center",
+      wrapText: true,
+      indent: 0,
+    };
+    c.border = thinGrid();
+  });
+
+  let expenseRowNum = 7;
+  for (const expense of expenses) {
+    totalExpensesArs += expense.amountArs;
+    const r = gastos.getRow(expenseRowNum);
+    r.height = DATA_ROW_MIN_H;
+    const cells = [
+      formatInTimeZone(expense.expenseDate, tz, "yyyy-MM-dd"),
+      expenseKindLabel(expense.kind),
+      expense.name,
+      formatArs(expense.amountArs),
+      expense.note ?? "",
+    ];
+    const zebra = expenseRowNum % 2 === 1;
+    cells.forEach((val, i) => {
+      const c = r.getCell(i + 1);
+      c.value = val;
+      c.alignment = {
+        vertical: "middle",
+        wrapText: i === 2 || i === 4,
+        horizontal: i === 3 ? "right" : "left",
+        indent: i === 3 ? 0 : 1,
+      };
+      if (zebra) {
+        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ZEBRA } };
+      }
+    });
+    expenseRowNum++;
+  }
+
+  const lastExpenseRow = expenseRowNum - 1;
+
+  if (expenses.length === 0) {
+    gastos.mergeCells(`A${expenseRowNum}:E${expenseRowNum}`);
+    const empty = gastos.getCell(`A${expenseRowNum}`);
+    empty.value = "No hay gastos registrados para exportar.";
+    empty.font = { italic: true, color: { argb: "FF94A3B8" }, size: 11 };
+    empty.alignment = { horizontal: "center", vertical: "middle" };
+    empty.border = thinGrid();
+    gastos.getRow(expenseRowNum).height = 28;
+  } else {
+    for (let r = expenseHeaderRowIndex; r <= lastExpenseRow; r++) {
+      for (let col = 1; col <= 5; col++) {
+        const cell = gastos.getRow(r).getCell(col);
+        cell.border = tableOutline(r, col, expenseHeaderRowIndex, lastExpenseRow, 1, 5);
+      }
+    }
+    gastos.autoFilter = `A${expenseHeaderRowIndex}:E${lastExpenseRow}`;
+  }
+
   // --- Balance ---
   const n = bookings.length;
   const avgCents = n > 0 ? Math.round(totalCents / n) : 0;
+  const incomeArs = Math.round(totalCents / 100);
+  const netArs = incomeArs - totalExpensesArs;
 
   const bal = wb.addWorksheet("Balance", {
     properties: { tabColor: { argb: VIOLET } },
@@ -250,7 +391,7 @@ export async function buildHistoryExportXlsxBuffer(args: {
 
   bal.mergeCells("A2:B2");
   bal.getCell("A2").value =
-    "Totales calculados con el precio guardado en cada servicio. No reemplaza facturación ni cobros reales.";
+    "Combina ingresos estimados por turnos confirmados con gastos registrados en la hoja «Gastos». No reemplaza facturación ni contabilidad real.";
   bal.getCell("A2").font = { size: 10, color: { argb: "FF64748B" }, italic: true };
   bal.getCell("A2").alignment = { vertical: "middle", wrapText: true, indent: 1 };
 
@@ -274,7 +415,10 @@ export async function buildHistoryExportXlsxBuffer(args: {
 
   const summaryRows: [string, string, "normal" | "highlight"][] = [
     ["Turnos incluidos en la hoja «Turnos»", String(n), "normal"],
-    ["Total estimado ($)", formatArsFromCents(totalCents), "highlight"],
+    ["Gastos incluidos en la hoja «Gastos»", String(expenses.length), "normal"],
+    ["Ingresos estimados ($)", formatArs(incomeArs), "normal"],
+    ["Gastos registrados ($)", formatArs(totalExpensesArs), "normal"],
+    ["Balance neto estimado ($)", formatArs(netArs), "highlight"],
     ["Promedio por turno ($)", n > 0 ? formatArsFromCents(avgCents) : "—", "normal"],
   ];
 

@@ -76,7 +76,7 @@ export function PlanStripe({
         <li className="flex items-center gap-1.5">
           <LockIcon className="h-3.5 w-3.5 text-amber-700/90" />
           <span>
-            Excel con turnos + balance <span className="text-slate-400">(Premium)</span>
+            Excel con turnos + gastos + balance <span className="text-slate-400">(Premium)</span>
           </span>
         </li>
         <li className="flex items-center gap-1.5">
